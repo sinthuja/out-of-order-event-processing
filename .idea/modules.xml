@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/siddhi-extensions/org.siddhi.extension.disorder.handler.iml" filepath="$PROJECT_DIR$/siddhi-extensions/org.siddhi.extension.disorder.handler.iml" />
+      <module fileurl="file://$PROJECT_DIR$/simulator/executor/org.siddhi.input.order.simulator.executor.iml" filepath="$PROJECT_DIR$/simulator/executor/org.siddhi.input.order.simulator.executor.iml" group="simulator and modules" />
+      <module fileurl="file://$PROJECT_DIR$/out-of-order-event-processing.iml" filepath="$PROJECT_DIR$/out-of-order-event-processing.iml" />
+      <module fileurl="file://$PROJECT_DIR$/simulator/simulator.iml" filepath="$PROJECT_DIR$/simulator/simulator.iml" group="simulator and modules" />
+    </modules>
+  </component>
+</project>
