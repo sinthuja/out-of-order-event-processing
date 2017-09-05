@@ -102,7 +102,7 @@ public class SequenceReorderTestCase {
     }
 
 
-    @Test
+    @Test()
     public void orderTestWithTimeout() throws InterruptedException {
         log.info("SequenceReorderTestCase TestCase 1");
         SiddhiManager siddhiManager = new SiddhiManager();
@@ -120,11 +120,11 @@ public class SequenceReorderTestCase {
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
                 for (org.wso2.siddhi.core.event.Event event : events) {
                     count++;
-                    System.out.println("results: " + event.getData()[0]);
+//                    System.out.println("results: " + event.getData()[0]);
                 }
                 endTime = System.currentTimeMillis();
-                System.out.println("Latency ==> " + (endTime - startTime));
-                System.out.println("Count ========> " + count);
+//                System.out.println("Latency ==> " + (endTime - startTime));
+//                System.out.println("Count ========> " + count);
             }
         });
 
@@ -152,7 +152,7 @@ public class SequenceReorderTestCase {
         startTime = System.currentTimeMillis();
         inputHandler.send(new Object[]{SOURCE_ID, 10L, 200L});
 //        startTime = System.currentTimeMillis();
-//        inputHandler.send(new Object[]{SOURCE_ID, 9L, 200L});
+//        inputHandler.send(new Object[]{SOURCE_ID, 9L, 500L});
 
         Thread.sleep(2000);
         executionPlanRuntime.shutdown();

@@ -21,6 +21,7 @@ import org.apache.log4j.Logger;
 import org.wso2.siddhi.annotation.Example;
 import org.wso2.siddhi.annotation.Extension;
 import org.wso2.siddhi.core.config.SiddhiAppContext;
+import org.wso2.siddhi.core.event.ComplexEvent;
 import org.wso2.siddhi.core.event.ComplexEventChunk;
 import org.wso2.siddhi.core.event.stream.StreamEvent;
 import org.wso2.siddhi.core.event.stream.StreamEventCloner;
@@ -29,15 +30,15 @@ import org.wso2.siddhi.core.exception.SiddhiAppCreationException;
 import org.wso2.siddhi.core.executor.ConstantExpressionExecutor;
 import org.wso2.siddhi.core.executor.ExpressionExecutor;
 import org.wso2.siddhi.core.query.processor.Processor;
+import org.wso2.siddhi.core.query.processor.SchedulingProcessor;
 import org.wso2.siddhi.core.query.processor.stream.StreamProcessor;
+import org.wso2.siddhi.core.stream.input.source.Source;
+import org.wso2.siddhi.core.util.Scheduler;
 import org.wso2.siddhi.core.util.config.ConfigReader;
 import org.wso2.siddhi.query.api.definition.AbstractDefinition;
 import org.wso2.siddhi.query.api.definition.Attribute;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Extension(
         name = "reorder",
@@ -50,17 +51,18 @@ import java.util.Map;
                 "                + \"volume \" +\n" +
                 "                \"insert into outputStream;")
 )
-public class SequenceBasedReorderExtension extends StreamProcessor {
+public class SequenceBasedReorderExtension extends StreamProcessor implements SchedulingProcessor {
     private static Logger log = Logger.getLogger(SequenceBasedReorderExtension.class);
 
 
     private static final String CONFIDENT_LEVEL = "__confidence_level";
-    private static final Long DEFAULT_TIMEOUT_MILLI_SEC = 100L;
+    private static final Long DEFAULT_TIMEOUT_MILLI_SEC = 20L;
 
     private ExpressionExecutor sourceIdExecutor;
     private ExpressionExecutor sequenceNumberExecutor;
     private ExpressionExecutor timestampExecutor;
-    private Long timeout;
+    private Long timeout = DEFAULT_TIMEOUT_MILLI_SEC;
+    private Scheduler scheduler;
 
     private HashMap<String, EventSource> sourceHashMap = new HashMap<>();
 
@@ -75,35 +77,53 @@ public class SequenceBasedReorderExtension extends StreamProcessor {
             while (complexEventChunk.hasNext()) {
                 try {
                     event = complexEventChunk.next();
-                    sourceId = (String) sourceIdExecutor.execute(event);
-                    sequenceNumber = (Long) sequenceNumberExecutor.execute(event);
-                    if (timestampExecutor != null) {
-                        timestamp = (Long) timestampExecutor.execute(event);
-                    } else {
-                        timestamp = event.getTimestamp();
-                    }
-                    EventSource source = sourceHashMap.get(sourceId);
-                    if (source == null) {
-                        source = new EventSource(sourceId);
-                        sourceHashMap.put(sourceId, source);
-                    }
-                    boolean[] response = source.isInOrder(event, sequenceNumber);
-                    if (response[0]) {
-                        orderedEventChunk.add(event);
-                        log.info("inorder: " + event);
-                        if (response[1]) {
-                            List<StreamEvent> orderedEvents = source.checkAndReleaseBufferedEvents();
-                            for (StreamEvent streamEvent : orderedEvents) {
-                                orderedEventChunk.add(streamEvent);
+                    log.info("Event ---> "+ event);
+                    if (event.getType().equals(ComplexEvent.Type.CURRENT)) {
+                        sourceId = (String) sourceIdExecutor.execute(event);
+                        sequenceNumber = (Long) sequenceNumberExecutor.execute(event);
+                        if (timestampExecutor != null) {
+                            timestamp = (Long) timestampExecutor.execute(event);
+                        } else {
+                            timestamp = event.getTimestamp();
+                        }
+                        EventSource source = sourceHashMap.get(sourceId);
+                        if (source == null) {
+                            source = new EventSource(sourceId);
+                            sourceHashMap.put(sourceId, source);
+                        }
+                        long currentTime = System.currentTimeMillis();
+                        boolean[] response = source.isInOrder(event, sequenceNumber, currentTime);
+                        if (response[0]) {
+                            orderedEventChunk.add(event);
+//                            log.info("inorder: " + event);
+                            if (response[1]) {
+                                addToEventChunk(orderedEventChunk, source.checkAndReleaseBufferedEvents());
                             }
+                        } else {
+                            scheduler.notifyAt(currentTime + timeout);
+                        }
+                    } else {
+                        long currentTimestamp = System.currentTimeMillis();
+                        //TODO: improve find the source of the timeout event
+                        Iterator<String> sources = sourceHashMap.keySet().iterator();
+                        while (sources.hasNext()) {
+                            EventSource source = sourceHashMap.get(sources.next());
+                            addToEventChunk(orderedEventChunk, source.releaseTimeoutBufferedEvents(currentTimestamp));
                         }
                     }
                 } catch (UnsupportedParameterException e) {
                     log.error("The event is not unsupported value. ", e);
                 }
+
             }
         }
         processor.process(orderedEventChunk);
+    }
+
+    private void addToEventChunk(ComplexEventChunk<StreamEvent> streamEventComplexEventChunk, List<StreamEvent> events) {
+        for (StreamEvent event : events) {
+            streamEventComplexEventChunk.add(event);
+        }
     }
 
     @Override
@@ -211,5 +231,15 @@ public class SequenceBasedReorderExtension extends StreamProcessor {
     @Override
     public void restoreState(Map<String, Object> map) {
 
+    }
+
+    @Override
+    public Scheduler getScheduler() {
+        return this.scheduler;
+    }
+
+    @Override
+    public void setScheduler(Scheduler scheduler) {
+        this.scheduler = scheduler;
     }
 }

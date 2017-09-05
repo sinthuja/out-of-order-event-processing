@@ -30,7 +30,8 @@ public class EventSource {
 
     private String name;
     private AtomicLong lastSequenceNumber;
-    private TreeMap<Long, StreamEvent> buffer;
+    private TreeMap<Long, StreamEventWrapper> buffer;
+    private TreeMap<Long, Long> timeoutBuffer;
 
     public EventSource(String name) throws UnsupportedParameterException {
         if (name == null || name.isEmpty()) {
@@ -39,13 +40,14 @@ public class EventSource {
         this.name = name;
         this.lastSequenceNumber = new AtomicLong(0);
         this.buffer = new TreeMap<>();
+        this.timeoutBuffer = new TreeMap<>();
     }
 
     public String getName() {
         return name;
     }
 
-    public boolean[] isInOrder(StreamEvent event, long sequenceNumber) {
+    public boolean[] isInOrder(StreamEvent event, long sequenceNumber, long currentTime) {
         boolean[] inOrderResponse = new boolean[2]; // 1st element - inOrderOrNot, 2nd Element - whether can flush bufferedEevnts
         long expectedNextSeqNumber = lastSequenceNumber.get() + 1;
         if (sequenceNumber == expectedNextSeqNumber) {
@@ -53,7 +55,8 @@ public class EventSource {
             inOrderResponse[0] = true;
             inOrderResponse[1] = buffer.size() > 0;
         } else if (sequenceNumber > expectedNextSeqNumber) {
-            buffer.put(sequenceNumber, event);
+            buffer.put(sequenceNumber, new StreamEventWrapper(event, currentTime));
+            timeoutBuffer.put(currentTime, sequenceNumber);
         } else {
             log.error("Expected Sequence number " + expectedNextSeqNumber + " is greater than received sequence number "
                     + sequenceNumber);
@@ -70,21 +73,70 @@ public class EventSource {
             while (iterator.hasNext()) {
                 Long key = iterator.next();
                 if (expectedSeqNum == key) {
-                    StreamEvent streamEvent = this.buffer.get(key);
+                    StreamEventWrapper streamEventWrapper = this.buffer.get(key);
                     releasedSeqNumbers.add(key);
-                    streamEvents.add(streamEvent);
-                    log.info("release: " + streamEvent);
+                    this.timeoutBuffer.remove(streamEventWrapper.getTimestamp());
+                    streamEvents.add(streamEventWrapper.getStreamEvent());
                     expectedSeqNum = lastSequenceNumber.incrementAndGet() + 1;
                 } else if (expectedSeqNum < key) {
                     break;
                 }
             }
-            for (Long seqNum: releasedSeqNumbers){
+            for (Long seqNum : releasedSeqNumbers) {
                 this.buffer.remove(seqNum);
             }
             return streamEvents;
         }
         return null;
+    }
+
+    private List<StreamEvent> releaseBufferedEvents(long sequenceNumber) {
+        if (this.buffer.size() > 0) {
+            List<StreamEvent> streamEvents = new ArrayList<>();
+            List<Long> releasedSeqNumbers = new ArrayList<>();
+            Iterator<Long> iterator = this.buffer.keySet().iterator();
+            while (iterator.hasNext()) {
+                Long key = iterator.next();
+                if (key <= sequenceNumber) {
+                    StreamEventWrapper streamEventWrapper = this.buffer.get(key);
+                    releasedSeqNumbers.add(key);
+                    this.timeoutBuffer.remove(streamEventWrapper.getTimestamp());
+                    streamEvents.add(streamEventWrapper.getStreamEvent());
+                } else {
+                    break;
+                }
+            }
+            lastSequenceNumber.set(sequenceNumber);
+            for (Long seqNum : releasedSeqNumbers) {
+                this.buffer.remove(seqNum);
+            }
+            return streamEvents;
+        }
+        return null;
+    }
+
+    public List<StreamEvent> releaseTimeoutBufferedEvents(long currentTimestamp) {
+        Iterator<Long> timestamp = this.timeoutBuffer.keySet().iterator();
+        List<Long> timeStampToRemove = new ArrayList<>();
+        List<StreamEvent> releasedEvents = new ArrayList<>();
+        while (timestamp.hasNext()) {
+            long eventTimestamp = timestamp.next();
+            if (eventTimestamp <= currentTimestamp) {
+                timeStampToRemove.add(eventTimestamp);
+            } else {
+                break;
+            }
+        }
+        for (Long timeStamp : timeStampToRemove) {
+            Long sequenceNum = this.timeoutBuffer.remove(timeStamp);
+            if (sequenceNum != null) {
+                List<StreamEvent> releaseBufferedEvents = releaseBufferedEvents(sequenceNum);
+                if (releaseBufferedEvents != null) {
+                    releasedEvents.addAll(releaseBufferedEvents);
+                }
+            }
+        }
+        return releasedEvents;
     }
 
     public boolean equals(Object object) {
