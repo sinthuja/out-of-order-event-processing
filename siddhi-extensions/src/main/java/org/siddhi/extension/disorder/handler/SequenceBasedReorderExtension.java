@@ -77,7 +77,7 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
             while (complexEventChunk.hasNext()) {
                 try {
                     event = complexEventChunk.next();
-                    log.info("Event ---> "+ event);
+                    complexEventChunk.remove();
                     if (event.getType().equals(ComplexEvent.Type.CURRENT)) {
                         sourceId = (String) sourceIdExecutor.execute(event);
                         sequenceNumber = (Long) sequenceNumberExecutor.execute(event);
@@ -95,7 +95,6 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                         boolean[] response = source.isInOrder(event, sequenceNumber, currentTime);
                         if (response[0]) {
                             orderedEventChunk.add(event);
-//                            log.info("inorder: " + event);
                             if (response[1]) {
                                 addToEventChunk(orderedEventChunk, source.checkAndReleaseBufferedEvents());
                             }

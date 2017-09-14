@@ -16,5 +16,7 @@
 
     <modules>
         <module>executor</module>
+        <module>siddi-server</module>
+        <module>client</module>
     </modules>
 </project>
