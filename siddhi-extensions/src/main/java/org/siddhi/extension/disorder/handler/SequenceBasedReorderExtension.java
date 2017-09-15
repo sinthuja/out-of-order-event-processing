@@ -71,7 +71,6 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
             StreamEvent event;
             String sourceId;
             Long sequenceNumber;
-            long timestamp;
             while (complexEventChunk.hasNext()) {
                 try {
                     event = complexEventChunk.next();
@@ -84,21 +83,19 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                             source = new EventSource(sourceId, timestampExecutor);
                             sourceHashMap.put(sourceId, source);
                         }
-                        long currentTime = System.currentTimeMillis();
-                        boolean[] response = source.isInOrder(event, sequenceNumber, currentTime);
+                        long expiryTimestamp = System.currentTimeMillis() + Math.min(userDefinedTimeout, Math.max(source.getAverageInoderEventArrivalInterval(),
+                                source.getBufferedEventsDelay()));
+                        boolean[] response = source.isInOrder(event, sequenceNumber, expiryTimestamp);
                         if (response[0]) {
                             orderedEventChunk.add(event);
                             if (response[1]) {
                                 addToEventChunk(orderedEventChunk, source.checkAndReleaseBufferedEvents());
                             }
                         } else {
-
-                            scheduler.notifyAt(currentTime + Math.min(userDefinedTimeout, Math.max(source.getAverageInoderEventArrivalInterval(),
-                                    source.getMaxDelay())));
+                            scheduler.notifyAt(expiryTimestamp);
                         }
                     } else {
                         long currentTimestamp = System.currentTimeMillis();
-                        //TODO: improve find the source of the userDefinedTimeout event
                         Iterator<String> sources = sourceHashMap.keySet().iterator();
                         while (sources.hasNext()) {
                             EventSource source = sourceHashMap.get(sources.next());
@@ -114,9 +111,9 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
         processor.process(orderedEventChunk);
     }
 
-    private void addToEventChunk(ComplexEventChunk<StreamEvent> streamEventComplexEventChunk, List<StreamEvent> events) {
-        for (StreamEvent event : events) {
-            streamEventComplexEventChunk.add(event);
+    private void addToEventChunk(ComplexEventChunk<StreamEvent> streamEventComplexEventChunk, List<StreamEventWrapper> events) {
+        for (StreamEventWrapper event : events) {
+            streamEventComplexEventChunk.add(event.getStreamEvent());
         }
     }
 
