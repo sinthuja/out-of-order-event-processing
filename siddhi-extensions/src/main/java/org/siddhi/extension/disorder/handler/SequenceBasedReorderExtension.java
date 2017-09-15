@@ -32,7 +32,6 @@ import org.wso2.siddhi.core.executor.ExpressionExecutor;
 import org.wso2.siddhi.core.query.processor.Processor;
 import org.wso2.siddhi.core.query.processor.SchedulingProcessor;
 import org.wso2.siddhi.core.query.processor.stream.StreamProcessor;
-import org.wso2.siddhi.core.stream.input.source.Source;
 import org.wso2.siddhi.core.util.Scheduler;
 import org.wso2.siddhi.core.util.config.ConfigReader;
 import org.wso2.siddhi.query.api.definition.AbstractDefinition;
@@ -54,20 +53,19 @@ import java.util.*;
 public class SequenceBasedReorderExtension extends StreamProcessor implements SchedulingProcessor {
     private static Logger log = Logger.getLogger(SequenceBasedReorderExtension.class);
 
-
-    private static final String CONFIDENT_LEVEL = "__confidence_level";
     private static final Long DEFAULT_TIMEOUT_MILLI_SEC = 20L;
 
     private ExpressionExecutor sourceIdExecutor;
     private ExpressionExecutor sequenceNumberExecutor;
     private ExpressionExecutor timestampExecutor;
-    private Long timeout = DEFAULT_TIMEOUT_MILLI_SEC;
+    private long userDefinedTimeout = DEFAULT_TIMEOUT_MILLI_SEC;
     private Scheduler scheduler;
 
     private HashMap<String, EventSource> sourceHashMap = new HashMap<>();
 
     @Override
-    protected void process(ComplexEventChunk<StreamEvent> complexEventChunk, Processor processor, StreamEventCloner streamEventCloner, ComplexEventPopulater complexEventPopulater) {
+    protected void process(ComplexEventChunk<StreamEvent> complexEventChunk, Processor processor,
+                           StreamEventCloner streamEventCloner, ComplexEventPopulater complexEventPopulater) {
         ComplexEventChunk<StreamEvent> orderedEventChunk = new ComplexEventChunk<>(null, null, complexEventChunk.isBatch());
         synchronized (this) {
             StreamEvent event;
@@ -81,14 +79,9 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                     if (event.getType().equals(ComplexEvent.Type.CURRENT)) {
                         sourceId = (String) sourceIdExecutor.execute(event);
                         sequenceNumber = (Long) sequenceNumberExecutor.execute(event);
-                        if (timestampExecutor != null) {
-                            timestamp = (Long) timestampExecutor.execute(event);
-                        } else {
-                            timestamp = event.getTimestamp();
-                        }
                         EventSource source = sourceHashMap.get(sourceId);
                         if (source == null) {
-                            source = new EventSource(sourceId);
+                            source = new EventSource(sourceId, timestampExecutor);
                             sourceHashMap.put(sourceId, source);
                         }
                         long currentTime = System.currentTimeMillis();
@@ -99,11 +92,13 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                                 addToEventChunk(orderedEventChunk, source.checkAndReleaseBufferedEvents());
                             }
                         } else {
-                            scheduler.notifyAt(currentTime + timeout);
+
+                            scheduler.notifyAt(currentTime + Math.min(userDefinedTimeout, Math.max(source.getAverageInoderEventArrivalInterval(),
+                                    source.getMaxDelay())));
                         }
                     } else {
                         long currentTimestamp = System.currentTimeMillis();
-                        //TODO: improve find the source of the timeout event
+                        //TODO: improve find the source of the userDefinedTimeout event
                         Iterator<String> sources = sourceHashMap.keySet().iterator();
                         while (sources.hasNext()) {
                             EventSource source = sourceHashMap.get(sources.next());
@@ -164,13 +159,13 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
             }
             if (expressionExecutors[2].getReturnType() == Attribute.Type.LONG) {
                 if (expressionExecutors[2] instanceof ConstantExpressionExecutor) {
-                    timeout = (Long) expressionExecutors[2].execute(null);
+                    userDefinedTimeout = (Long) expressionExecutors[2].execute(null);
                 } else {
                     timestampExecutor = expressionExecutors[2];
                 }
             } else {
                 throw new SiddhiAppCreationException("Expected a field with Long return type as timestamp field " +
-                        "or Long constant for the timeout field, "
+                        "or Long constant for the userDefinedTimeout field, "
                         + "but found a field with return type - " + expressionExecutors[2].getReturnType());
             }
         } else {
@@ -200,9 +195,9 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
             }
             if (expressionExecutors[3].getReturnType() == Attribute.Type.LONG) {
                 if (expressionExecutors[3] instanceof ConstantExpressionExecutor) {
-                    timeout = (Long) expressionExecutors[3].execute(null);
+                    userDefinedTimeout = (Long) expressionExecutors[3].execute(null);
                 } else {
-                    throw new SiddhiAppCreationException("Expected Long constant for the timeout field, but non constant field found");
+                    throw new SiddhiAppCreationException("Expected Long constant for the userDefinedTimeout field, but non constant field found");
                 }
             } else {
                 throw new SiddhiAppCreationException("Expected a field with Long return type but found a field with - "

@@ -28,10 +28,6 @@ import org.wso2.siddhi.core.SiddhiManager;
 import org.wso2.siddhi.core.stream.input.InputHandler;
 import org.wso2.siddhi.core.stream.output.StreamCallback;
 
-/**
- * This is the test case for KSlackExtension.
- * Created by miyurud on 8/10/15.
- */
 public class SequenceReorderTestCase {
     private static final Logger log = Logger.getLogger(SequenceReorderTestCase.class);
     private int count;

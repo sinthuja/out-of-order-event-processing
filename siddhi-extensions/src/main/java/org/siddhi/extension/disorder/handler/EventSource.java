@@ -18,8 +18,8 @@
 package org.siddhi.extension.disorder.handler;
 
 import org.apache.log4j.Logger;
-import org.wso2.siddhi.core.event.ComplexEventChunk;
 import org.wso2.siddhi.core.event.stream.StreamEvent;
+import org.wso2.siddhi.core.executor.ExpressionExecutor;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,30 +30,34 @@ public class EventSource {
 
     private String name;
     private AtomicLong lastSequenceNumber;
+    private long averageInoderEventArrivalInterval;
+    private long lastEventTimeStamp;
     private TreeMap<Long, StreamEventWrapper> buffer;
     private TreeMap<Long, Long> timeoutBuffer;
+    private ExpressionExecutor timestampExecutor;
+    private long maxDelay;
 
-    public EventSource(String name) throws UnsupportedParameterException {
+    EventSource(String name, ExpressionExecutor timestampExecutor) throws UnsupportedParameterException {
         if (name == null || name.isEmpty()) {
             throw new UnsupportedParameterException("Name of the event source is empty!");
         }
         this.name = name;
         this.lastSequenceNumber = new AtomicLong(0);
+        this.timestampExecutor = timestampExecutor;
+        this.averageInoderEventArrivalInterval = -1;
+        this.maxDelay = -1;
         this.buffer = new TreeMap<>();
         this.timeoutBuffer = new TreeMap<>();
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public boolean[] isInOrder(StreamEvent event, long sequenceNumber, long currentTime) {
+    boolean[] isInOrder(StreamEvent event, long sequenceNumber, long currentTime) {
         boolean[] inOrderResponse = new boolean[2]; // 1st element - inOrderOrNot, 2nd Element - whether can flush bufferedEevnts
         long expectedNextSeqNumber = lastSequenceNumber.get() + 1;
         if (sequenceNumber == expectedNextSeqNumber) {
             lastSequenceNumber.incrementAndGet();
             inOrderResponse[0] = true;
             inOrderResponse[1] = buffer.size() > 0;
+            calculateEventArrivalInterval(event);
         } else if (sequenceNumber > expectedNextSeqNumber) {
             buffer.put(sequenceNumber, new StreamEventWrapper(event, currentTime));
             timeoutBuffer.put(currentTime, sequenceNumber);
@@ -64,7 +68,7 @@ public class EventSource {
         return inOrderResponse;
     }
 
-    public List<StreamEvent> checkAndReleaseBufferedEvents() {
+    List<StreamEvent> checkAndReleaseBufferedEvents() {
         if (this.buffer.size() > 0) {
             List<StreamEvent> streamEvents = new ArrayList<>();
             List<Long> releasedSeqNumbers = new ArrayList<>();
@@ -83,11 +87,35 @@ public class EventSource {
                 }
             }
             for (Long seqNum : releasedSeqNumbers) {
-                this.buffer.remove(seqNum);
+                calculateEventArrivalInterval(this.buffer.remove(seqNum).getStreamEvent());
             }
             return streamEvents;
         }
         return null;
+    }
+
+    private void calculateEventArrivalInterval(StreamEvent event) {
+        long currentEventTimestamp = event.getTimestamp();
+        if (timestampExecutor != null) {
+            currentEventTimestamp = (Long) timestampExecutor.execute(event);
+        }
+        if (lastEventTimeStamp == 0) {
+            this.lastEventTimeStamp = currentEventTimestamp;
+        } else {
+            if (currentEventTimestamp < this.lastEventTimeStamp) {
+                log.error("Current event timestamp is greater than last known event timestamp! Current timestamp - " + currentEventTimestamp + " , lastEventTimestamp: " + lastEventTimeStamp);
+                this.lastEventTimeStamp = currentEventTimestamp;
+            } else {
+                if (averageInoderEventArrivalInterval == -1) {
+                    this.averageInoderEventArrivalInterval = currentEventTimestamp - this.lastEventTimeStamp;
+                    this.lastEventTimeStamp = currentEventTimestamp;
+                } else {
+                    this.averageInoderEventArrivalInterval = Math.round(((currentEventTimestamp - this.lastEventTimeStamp)
+                            + this.averageInoderEventArrivalInterval) * 0.5);
+                    this.lastEventTimeStamp = currentEventTimestamp;
+                }
+            }
+        }
     }
 
     private List<StreamEvent> releaseBufferedEvents(long sequenceNumber) {
@@ -106,16 +134,22 @@ public class EventSource {
                     break;
                 }
             }
-            lastSequenceNumber.set(sequenceNumber);
+            long lastReleasedSequenceNum = lastSequenceNumber.getAndSet(sequenceNumber);
             for (Long seqNum : releasedSeqNumbers) {
-                this.buffer.remove(seqNum);
+                StreamEventWrapper streamEventWrapper = this.buffer.remove(seqNum);
+                if (seqNum == lastReleasedSequenceNum + 1) {
+                    calculateEventArrivalInterval(streamEventWrapper.getStreamEvent());
+                } else {
+                    this.lastEventTimeStamp = 0;
+                    lastReleasedSequenceNum = seqNum;
+                }
             }
             return streamEvents;
         }
         return null;
     }
 
-    public List<StreamEvent> releaseTimeoutBufferedEvents(long currentTimestamp) {
+    List<StreamEvent> releaseTimeoutBufferedEvents(long currentTimestamp) {
         Iterator<Long> timestamp = this.timeoutBuffer.keySet().iterator();
         List<Long> timeStampToRemove = new ArrayList<>();
         List<StreamEvent> releasedEvents = new ArrayList<>();
@@ -147,5 +181,20 @@ public class EventSource {
             }
         }
         return false;
+    }
+
+    long getAverageInoderEventArrivalInterval() {
+        log.info("Inorder event arrival interval : " + averageInoderEventArrivalInterval);
+        if (this.averageInoderEventArrivalInterval == -1 || this.averageInoderEventArrivalInterval == 0) {
+            return Long.MAX_VALUE;
+        }
+        return averageInoderEventArrivalInterval;
+    }
+
+    long getMaxDelay(){
+        if (this.maxDelay == -1 || this.maxDelay == 0){
+            return Long.MAX_VALUE;
+        }
+        return maxDelay;
     }
 }
