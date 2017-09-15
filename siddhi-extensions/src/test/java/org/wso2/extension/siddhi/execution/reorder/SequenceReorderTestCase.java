@@ -118,7 +118,7 @@ public class SequenceReorderTestCase {
                 }
                 endTime = System.currentTimeMillis();
 //                System.out.println("Latency ==> " + (endTime - startTime));
-//                System.out.println("Count ========> " + count);
+                System.out.println("Count ========> " + count);
             }
         });
 

@@ -83,7 +83,8 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                             source = new EventSource(sourceId, timestampExecutor);
                             sourceHashMap.put(sourceId, source);
                         }
-                        long expiryTimestamp = System.currentTimeMillis() + Math.min(userDefinedTimeout, Math.max(source.getAverageInoderEventArrivalInterval(),
+                        long expiryTimestamp = System.currentTimeMillis() +
+                                Math.min(userDefinedTimeout, Math.max(source.getAverageInoderEventArrivalInterval(),
                                 source.getBufferedEventsDelay()));
                         boolean[] response = source.isInOrder(event, sequenceNumber, expiryTimestamp);
                         if (response[0]) {

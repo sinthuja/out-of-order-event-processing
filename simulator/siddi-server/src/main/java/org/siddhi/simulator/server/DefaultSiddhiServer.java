@@ -23,8 +23,8 @@ import org.wso2.siddhi.core.SiddhiAppRuntime;
 import org.wso2.siddhi.core.SiddhiManager;
 import org.wso2.siddhi.core.stream.output.StreamCallback;
 
-public class SiddhiServer {
-    private static final Logger log = Logger.getLogger(SiddhiServer.class);
+public class DefaultSiddhiServer {
+    private static final Logger log = Logger.getLogger(DefaultSiddhiServer.class);
 
 
     public static void main(String[] args) {
@@ -36,10 +36,9 @@ public class SiddhiServer {
 
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
 
-        String query = ("@info(name = 'query1') from inputStream#reorder:sequence(sourceId, seqNum, eventTime) select seqNum, volume, eventTime " +
+        String query = ("@info(name = 'query1') from inputStream select seqNum, volume, eventTime " +
                 "insert into outputStream;");
 
-        siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
         SiddhiAppRuntime executionPlanRuntime = siddhiManager.createSiddhiAppRuntime(inStreamDefinition + query);
 
         executionPlanRuntime.addCallback("outputStream", new StreamCallback() {
@@ -50,13 +49,14 @@ public class SiddhiServer {
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
                 for (org.wso2.siddhi.core.event.Event event : events) {
                     latency = latency + (System.currentTimeMillis() - (Long)event.getData()[2]);
-                    System.out.println("results: " + event.getData()[0]);
                     count++;
+                    System.out.println("results: " + event.getData()[0]);
                 }
                 System.out.println("Count => "+ count);
                 System.out.println("Average Latency => "+ latency/count);
             }
         });
+
         executionPlanRuntime.start();
     }
 
