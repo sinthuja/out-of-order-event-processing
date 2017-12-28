@@ -24,11 +24,15 @@
         <processorPath useClasspath="true" />
         <module name="org.siddhi.extension.disorder.handler" />
         <module name="org.siddhi.input.order.simulator.executor" />
+        <module name="org.siddhi.simulator.client" />
+        <module name="org.siddhi.simulator.server" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
       <module name="org.siddhi.extension.disorder.handler" target="1.8" />
-      <module name="org.siddhi.input.order.simulator.executor" target="1.5" />
+      <module name="org.siddhi.input.order.simulator.executor" target="1.8" />
+      <module name="org.siddhi.simulator.client" target="1.5" />
+      <module name="org.siddhi.simulator.server" target="1.5" />
       <module name="out-of-order-event-processing" target="1.5" />
       <module name="simulator" target="1.5" />
     </bytecodeTargetLevel>

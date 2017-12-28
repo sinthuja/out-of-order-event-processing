@@ -4,6 +4,8 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/siddhi-extensions/org.siddhi.extension.disorder.handler.iml" filepath="$PROJECT_DIR$/siddhi-extensions/org.siddhi.extension.disorder.handler.iml" />
       <module fileurl="file://$PROJECT_DIR$/simulator/executor/org.siddhi.input.order.simulator.executor.iml" filepath="$PROJECT_DIR$/simulator/executor/org.siddhi.input.order.simulator.executor.iml" group="simulator and modules" />
+      <module fileurl="file://$PROJECT_DIR$/simulator/client/org.siddhi.simulator.client.iml" filepath="$PROJECT_DIR$/simulator/client/org.siddhi.simulator.client.iml" group="simulator and modules" />
+      <module fileurl="file://$PROJECT_DIR$/simulator/siddi-server/org.siddhi.simulator.server.iml" filepath="$PROJECT_DIR$/simulator/siddi-server/org.siddhi.simulator.server.iml" group="simulator and modules" />
       <module fileurl="file://$PROJECT_DIR$/out-of-order-event-processing.iml" filepath="$PROJECT_DIR$/out-of-order-event-processing.iml" />
       <module fileurl="file://$PROJECT_DIR$/simulator/simulator.iml" filepath="$PROJECT_DIR$/simulator/simulator.iml" group="simulator and modules" />
     </modules>

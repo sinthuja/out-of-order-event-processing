@@ -53,8 +53,10 @@ public class SingleEventSourcePublisher0 {
             Attribute.Type[] types = EventDefinitionConverterUtil.generateAttributeTypeArray(streamDefinition.getAttributeList());
             try {
                 log.info("Starting to publish events .. ");
-                for (int i = 0; i < 1000; i++) {
+                for (int i = 0; i < 100000; i++) {
+                    long startTime = System.currentTimeMillis();
                     arrayList = getEvents(i);
+                    System.out.println(System.currentTimeMillis() - startTime);
                     tcpNettyClient.send("TestServer/inputStream", BinaryEventConverter.convertToBinaryMessage(
                             arrayList.toArray(new Event[arrayList.size()]), types).array()).await();
                 }

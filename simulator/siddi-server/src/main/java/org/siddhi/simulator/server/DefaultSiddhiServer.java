@@ -50,9 +50,9 @@ public class DefaultSiddhiServer {
                 for (org.wso2.siddhi.core.event.Event event : events) {
                     latency = latency + (System.currentTimeMillis() - (Long)event.getData()[2]);
                     count++;
-                    System.out.println("results: " + event.getData()[0]);
+//                    System.out.println("results: " + event.getData()[0]);
                 }
-                System.out.println("Count => "+ count);
+//                System.out.println("Count => "+ count);
                 System.out.println("Average Latency => "+ latency/count);
             }
         });
