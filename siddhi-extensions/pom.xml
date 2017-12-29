@@ -33,6 +33,11 @@
             <version>3.2</version>
         </dependency>
         <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>${netty.verion}</version>
+        </dependency>
+        <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
             <version>6.8</version>
@@ -75,6 +80,7 @@
     <properties>
         <siddhi.version>4.0.0-M69</siddhi.version>
         <log4j.version>1.2.17.wso2v1</log4j.version>
+        <netty.verion>4.1.7.Final</netty.verion>
     </properties>
 
 </project>

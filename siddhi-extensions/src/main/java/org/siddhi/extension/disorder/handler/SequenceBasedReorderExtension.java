@@ -18,6 +18,7 @@
 package org.siddhi.extension.disorder.handler;
 
 import org.apache.log4j.Logger;
+import org.siddhi.extension.disorder.handler.synchronization.TCPNettySyncServer;
 import org.wso2.siddhi.annotation.Example;
 import org.wso2.siddhi.annotation.Extension;
 import org.wso2.siddhi.core.config.SiddhiAppContext;
@@ -207,12 +208,12 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
 
     @Override
     public void start() {
-
+        TCPNettySyncServer.getInstance().startIfNotAlready();
     }
 
     @Override
     public void stop() {
-
+        TCPNettySyncServer.getInstance().shutdownGracefullyIfNotUsed();
     }
 
     @Override

@@ -57,6 +57,19 @@ class EventSource {
         this.timeoutReleasedEvents = new TreeMap<>();
     }
 
+    EventSource(String name) throws UnsupportedParameterException {
+        if (name == null || name.isEmpty()) {
+            throw new UnsupportedParameterException("Name of the event source is empty!");
+        }
+        this.name = name;
+        this.lastSequenceNumber = new AtomicLong(0);
+        this.averageInoderEventArrivalInterval = -1;
+        this.bufferedEventsDelay = -1;
+        this.buffer = new TreeMap<>();
+        this.timeoutBuffer = new TreeMap<>();
+        this.timeoutReleasedEvents = new TreeMap<>();
+    }
+
     boolean[] isInOrder(StreamEvent event, long sequenceNumber, long expiryTimestamp) {
         boolean[] inOrderResponse = new boolean[2]; // 1st element - inOrderOrNot, 2nd Element - whether can flush bufferedEevnts
         long expectedNextSeqNumber = lastSequenceNumber.get() + 1;
