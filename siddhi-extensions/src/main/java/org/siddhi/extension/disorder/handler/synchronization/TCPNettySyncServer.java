@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * TCP Netty Server.
  */
+
 public class TCPNettySyncServer {
     private static final Logger log = Logger.getLogger(TCPNettySyncServer.class);
     private ServerBootstrap bootstrap;
@@ -58,7 +59,7 @@ public class TCPNettySyncServer {
     public synchronized void startIfNotAlready() {
         ServerConfig config = new ServerConfig();
         if (!isStarted.get()) {
-            start(new ServerConfig());
+            start(config);
             isStarted.set(true);
         }
         appsInUse.incrementAndGet();
@@ -80,7 +81,7 @@ public class TCPNettySyncServer {
                     @Override
                     protected void initChannel(Channel channel) throws Exception {
                         ChannelPipeline p = channel.pipeline();
-                        p.addLast(new SyncMessageDecoder(flowController));
+                        p.addLast(new TCPServerInboundHandler());
                     }
                 })
                 .option(ChannelOption.TCP_NODELAY, true)

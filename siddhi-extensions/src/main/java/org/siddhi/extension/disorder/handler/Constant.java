@@ -32,6 +32,9 @@ public final class Constant {
     public static final String DEFAULT_HOST = "0.0.0.0";
     public static final boolean DEFAULT_TCP_NO_DELAY = true;
     public static final boolean DEFAULT_KEEP_ALIVE = true;
+    public static final byte SUCCESS_RESPONSE = 0x20;
+    public static final byte FAILURE_RESPONSE = 0X50;
+    public static final byte PROTOCOL_VERSION = 0X01;
 
     private Constant() {
 

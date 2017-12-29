@@ -43,7 +43,7 @@
 
     <properties>
         <siddhi.version>4.0.0-M69</siddhi.version>
-        <siddhi.tcp.extensions>2.0.2</siddhi.tcp.extensions>
+        <siddhi.tcp.extensions>2.0.15-SNAPSHOT</siddhi.tcp.extensions>
         <log4j.version>1.2.17.wso2v1</log4j.version>
         <netty.verion>4.1.6.Final</netty.verion>
         <siddhi.map.binary.version>1.0.0</siddhi.map.binary.version>

@@ -44,7 +44,7 @@ public class SingleEventSourcePublisher0 {
         TCPNettyClient tcpNettyClient = null;
         try {
             tcpNettyClient = new TCPNettyClient();
-            tcpNettyClient.connect("localhost", 9892);
+            tcpNettyClient.connect("localhost", 9892, 7452, SOURCE_ID);
             ArrayList<Event> arrayList = null;
             final StreamDefinition streamDefinition = StreamDefinition.id("inputStream").attribute("sourceId", Attribute.Type.STRING)
                     .attribute("seqNum", Attribute.Type.LONG).attribute("volume",
