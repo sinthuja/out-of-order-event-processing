@@ -43,7 +43,6 @@ public class TCPNettySyncServer {
     private ChannelFuture channelFuture;
     private String hostAndPort;
     private ServerConfig serverConfig;
-    private FlowController flowController = new FlowController();
     private static TCPNettySyncServer instance = new TCPNettySyncServer();
     private AtomicInteger appsInUse = new AtomicInteger(0);
     private AtomicBoolean isStarted = new AtomicBoolean(false);
@@ -110,14 +109,6 @@ public class TCPNettySyncServer {
             workerGroup = null;
             bossGroup = null;
         }
-    }
-
-    public void pause() {
-        flowController.pause();
-    }
-
-    public void resume() {
-        flowController.resume();
     }
 }
 

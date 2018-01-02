@@ -35,6 +35,7 @@ public final class Constant {
     public static final byte SUCCESS_RESPONSE = 0x20;
     public static final byte FAILURE_RESPONSE = 0X50;
     public static final byte PROTOCOL_VERSION = 0X01;
+    public static final int WARM_UP_TIME_SYNC_ATTEMPTS = 5;
 
     private Constant() {
 
