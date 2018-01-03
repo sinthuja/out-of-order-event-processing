@@ -23,17 +23,13 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 import org.apache.log4j.Logger;
 import org.siddhi.extension.disorder.handler.Constant;
+import org.siddhi.extension.disorder.handler.multi.source.EventSourceDriftHolder;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class TCPServerInboundHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = Logger.getLogger(TCPServerInboundHandler.class);
-    private HashMap<String, Long> eventSourceDrift = new HashMap<>();
-    private HashMap<String, AtomicInteger> timeSyncAttempts = new HashMap<>();
-
 
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf in = (ByteBuf) msg;
@@ -71,7 +67,7 @@ public class TCPServerInboundHandler extends ChannelInboundHandlerAdapter {
                 long drift = requestReceiveTime - replySendTime - delay;
                 System.out.println("################### Current Drift => source : "
                         + sourceId + " , drift: " + drift);
-                updateTimeDrift(sourceId, drift);
+                EventSourceDriftHolder.getInstance().updateTimeDrift(sourceId, drift);
                 encoded = ctx.alloc().buffer(2);
                 encoded.writeByte(Constant.PROTOCOL_VERSION);
                 encoded.writeInt(Constant.SUCCESS_RESPONSE);
@@ -100,27 +96,4 @@ public class TCPServerInboundHandler extends ChannelInboundHandlerAdapter {
         return new String(bytes, Constant.DEFAULT_CHARSET);
     }
 
-    private void updateTimeDrift(String sourceId, long timeDrift){
-        String key = sourceId.toLowerCase();
-        synchronized (key.intern()) {
-            AtomicInteger attempts = this.timeSyncAttempts.get(key);
-            if (attempts != null) {
-                if (attempts.incrementAndGet() > Constant.WARM_UP_TIME_SYNC_ATTEMPTS){
-                    Long drift = this.eventSourceDrift.get(key);
-                    if (drift == null){
-                        this.eventSourceDrift.put(key, timeDrift);
-                    } else {
-                        drift = Math.round((drift + timeDrift) * 0.5);
-                        this.eventSourceDrift.put(key, drift);
-                        System.out.println("################### final Drift => source : "
-                                + sourceId + " , drift: " + drift);
-                    }
-                } else {
-                    attempts.incrementAndGet();
-                }
-            } else {
-                this.timeSyncAttempts.put(key, new AtomicInteger(1));
-            }
-        }
-    }
 }

@@ -119,6 +119,7 @@ class EventSource {
                     calculateBufferedEventsDelay(delay); // finding the time that was required to be buffered in due to the late arrival
                     releasedSeqNumbers.add(key);
                     removeFromTimeoutBuffer(streamEventWrapper.getExpiryTimestamp(), key);
+                    setEventTime(streamEventWrapper);
                     streamEvents.add(streamEventWrapper);
                     expectedSeqNum = lastSequenceNumber.incrementAndGet() + 1;
                 } else if (expectedSeqNum < key) {
@@ -131,6 +132,14 @@ class EventSource {
             return streamEvents;
         }
         return null;
+    }
+
+    private void setEventTime(StreamEventWrapper streamEventWrapper){
+        long currentEventTimestamp = streamEventWrapper.getStreamEvent().getTimestamp();
+        if (timestampExecutor != null) {
+            currentEventTimestamp = (Long) timestampExecutor.execute(streamEventWrapper.getStreamEvent());
+        }
+        streamEventWrapper.setEventTime(currentEventTimestamp);
     }
 
     private void removeFromTimeoutBuffer(long expiryTimestamp, long sequenceNum) {
@@ -240,6 +249,7 @@ class EventSource {
 
     private void addTimeoutReleasedEventsCache(List<StreamEventWrapper> eventList) {
         for (StreamEventWrapper streamEventWrapper : eventList) {
+            setEventTime(streamEventWrapper); // To order in the multiple sources.
             this.timeoutReleasedEvents.put(streamEventWrapper.getSequenceNum(), streamEventWrapper.getArrivalTimestamp());
         }
     }

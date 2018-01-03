@@ -19,10 +19,11 @@ package org.siddhi.extension.disorder.handler;
 
 import org.wso2.siddhi.core.event.stream.StreamEvent;
 
-class StreamEventWrapper {
+public class StreamEventWrapper {
     private StreamEvent streamEvent;
     private long expiryTimestamp;
     private long arrivalTimestamp;
+    private long eventTime;
     private long sequenceNum;
 
     StreamEventWrapper(StreamEvent streamEvent, long expiryTimestamp, long arrivalTimestamp, long sequenceNum) {
@@ -32,19 +33,27 @@ class StreamEventWrapper {
         this.sequenceNum = sequenceNum;
     }
 
-    StreamEvent getStreamEvent() {
+    public StreamEvent getStreamEvent() {
         return streamEvent;
     }
 
-    long getExpiryTimestamp() {
+    public long getExpiryTimestamp() {
         return expiryTimestamp;
     }
 
-    long getArrivalTimestamp(){
+    public long getArrivalTimestamp(){
         return arrivalTimestamp;
     }
 
-    long getSequenceNum() {
+    public long getSequenceNum() {
         return sequenceNum;
+    }
+
+    public long getEventTime() {
+        return eventTime;
+    }
+
+    public void setEventTime(long eventTime) {
+        this.eventTime = eventTime;
     }
 }

@@ -18,6 +18,8 @@
 package org.siddhi.extension.disorder.handler;
 
 import org.apache.log4j.Logger;
+import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizer;
+import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizerManager;
 import org.siddhi.extension.disorder.handler.synchronization.TCPNettySyncServer;
 import org.wso2.siddhi.annotation.Example;
 import org.wso2.siddhi.annotation.Extension;
@@ -61,6 +63,7 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     private ExpressionExecutor timestampExecutor;
     private long userDefinedTimeout = DEFAULT_TIMEOUT_MILLI_SEC;
     private Scheduler scheduler;
+    private MultiSourceEventSynchronizer synchronizer;
 
     private HashMap<String, EventSource> sourceHashMap = new HashMap<>();
 
@@ -89,9 +92,9 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                                 source.getBufferedEventsDelay()));
                         boolean[] response = source.isInOrder(event, sequenceNumber, expiryTimestamp);
                         if (response[0]) {
-                            orderedEventChunk.add(event);
+                            this.synchronizer.putEvent(sourceId, event, getEventTime(event));
                             if (response[1]) {
-                                addToEventChunk(orderedEventChunk, source.checkAndReleaseBufferedEvents());
+                                this.synchronizer.putEvent(sourceId, source.checkAndReleaseBufferedEvents());
                             }
                         } else {
                             scheduler.notifyAt(expiryTimestamp);
@@ -110,7 +113,16 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
 
             }
         }
-        processor.process(orderedEventChunk);
+//        TODO: need to pass for the next processor
+//        processor.process(orderedEventChunk);
+    }
+
+    private long getEventTime(StreamEvent event){
+        long currentEventTimestamp = event.getTimestamp();
+        if (timestampExecutor != null) {
+            currentEventTimestamp = (Long) timestampExecutor.execute(event);
+        }
+        return currentEventTimestamp;
     }
 
     private void addToEventChunk(ComplexEventChunk<StreamEvent> streamEventComplexEventChunk, List<StreamEventWrapper> events) {
@@ -123,6 +135,7 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     protected List<Attribute> init(AbstractDefinition abstractDefinition, ExpressionExecutor[] expressionExecutors, ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
 //        List<Attribute> attributes = new ArrayList<>();
 //        attributes.add(new Attribute(CONFIDENT_LEVEL, Attribute.Type.DOUBLE));
+        this.synchronizer = MultiSourceEventSynchronizerManager.getInstance().getMultiSourceEventSynchronizer(abstractDefinition.getId());
         if (attributeExpressionLength > 4) {
             throw new SiddhiAppCreationException("Maximum allowed expressions to sequence based reorder extension is 4! But found - " + attributeExpressionLength);
         }
