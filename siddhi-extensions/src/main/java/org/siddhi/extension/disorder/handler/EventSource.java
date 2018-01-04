@@ -24,7 +24,7 @@ import org.wso2.siddhi.core.executor.ExpressionExecutor;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-class EventSource {
+public class EventSource {
 
     private static Logger log = Logger.getLogger(EventSource.class);
 
@@ -276,5 +276,9 @@ class EventSource {
             return Long.MAX_VALUE;
         }
         return bufferedEventsDelay;
+    }
+
+    String getName(){
+        return this.name;
     }
 }

@@ -70,7 +70,6 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     @Override
     protected void process(ComplexEventChunk<StreamEvent> complexEventChunk, Processor processor,
                            StreamEventCloner streamEventCloner, ComplexEventPopulater complexEventPopulater) {
-        ComplexEventChunk<StreamEvent> orderedEventChunk = new ComplexEventChunk<>(null, null, complexEventChunk.isBatch());
         synchronized (this) {
             StreamEvent event;
             String sourceId;
@@ -86,10 +85,9 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                         if (source == null) {
                             source = new EventSource(sourceId, timestampExecutor);
                             sourceHashMap.put(sourceId, source);
+                            this.synchronizer.putTimeout(sourceId, getTimeout(source));
                         }
-                        long expiryTimestamp = System.currentTimeMillis() +
-                                Math.min(userDefinedTimeout, Math.max(source.getAverageInoderEventArrivalInterval(),
-                                source.getBufferedEventsDelay()));
+                        long expiryTimestamp = System.currentTimeMillis() + getTimeout(source);
                         boolean[] response = source.isInOrder(event, sequenceNumber, expiryTimestamp);
                         if (response[0]) {
                             this.synchronizer.putEvent(sourceId, event, getEventTime(event));
@@ -101,23 +99,24 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                         }
                     } else {
                         long currentTimestamp = System.currentTimeMillis();
-                        Iterator<String> sources = sourceHashMap.keySet().iterator();
-                        while (sources.hasNext()) {
-                            EventSource source = sourceHashMap.get(sources.next());
-                            addToEventChunk(orderedEventChunk, source.releaseTimeoutBufferedEvents(currentTimestamp));
+                        for (String s : sourceHashMap.keySet()) {
+                            EventSource source = sourceHashMap.get(s);
+                            this.synchronizer.putEvent(source.getName(), source.releaseTimeoutBufferedEvents(currentTimestamp));
                         }
                     }
                 } catch (UnsupportedParameterException e) {
                     log.error("The event is not unsupported value. ", e);
                 }
-
             }
         }
-//        TODO: need to pass for the next processor
-//        processor.process(orderedEventChunk);
     }
 
-    private long getEventTime(StreamEvent event){
+    private long getTimeout(EventSource source){
+        return Math.min(userDefinedTimeout, Math.max(source.getAverageInoderEventArrivalInterval(),
+                source.getBufferedEventsDelay()));
+    }
+
+    private long getEventTime(StreamEvent event) {
         long currentEventTimestamp = event.getTimestamp();
         if (timestampExecutor != null) {
             currentEventTimestamp = (Long) timestampExecutor.execute(event);
@@ -125,23 +124,20 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
         return currentEventTimestamp;
     }
 
-    private void addToEventChunk(ComplexEventChunk<StreamEvent> streamEventComplexEventChunk, List<StreamEventWrapper> events) {
-        for (StreamEventWrapper event : events) {
-            streamEventComplexEventChunk.add(event.getStreamEvent());
-        }
-    }
-
     @Override
-    protected List<Attribute> init(AbstractDefinition abstractDefinition, ExpressionExecutor[] expressionExecutors, ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
-//        List<Attribute> attributes = new ArrayList<>();
-//        attributes.add(new Attribute(CONFIDENT_LEVEL, Attribute.Type.DOUBLE));
-        this.synchronizer = MultiSourceEventSynchronizerManager.getInstance().getMultiSourceEventSynchronizer(abstractDefinition.getId());
+    protected List<Attribute> init(AbstractDefinition abstractDefinition, ExpressionExecutor[] expressionExecutors,
+                                   ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
+        this.synchronizer = MultiSourceEventSynchronizerManager.getInstance().
+                getMultiSourceEventSynchronizer(abstractDefinition.getId(), getNextProcessor());
+
         if (attributeExpressionLength > 4) {
-            throw new SiddhiAppCreationException("Maximum allowed expressions to sequence based reorder extension is 4! But found - " + attributeExpressionLength);
+            throw new SiddhiAppCreationException("Maximum allowed expressions to sequence based reorder extension is 4!" +
+                    " But found - " + attributeExpressionLength);
         }
 
         if (attributeExpressionLength == 1) {
-            throw new SiddhiAppCreationException("Minimum number of attributes is 2, those are Source ID and Sequence number fields of the stream. " +
+            throw new SiddhiAppCreationException("Minimum number of attributes is 2, those are Source ID and Sequence " +
+                    "number fields of the stream. " +
                     "But only found 1 attribute.");
         } else if (attributeExpressionLength == 2) {
             if (expressionExecutors[0].getReturnType() == Attribute.Type.STRING) {

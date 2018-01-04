@@ -20,20 +20,33 @@ package org.siddhi.extension.disorder.handler.multi.source;
 
 import org.wso2.siddhi.core.event.stream.StreamEvent;
 
-public class MultiSourceEventWrapper {
+public class MultiSourceEventWrapper implements Comparable<MultiSourceEventWrapper> {
     private StreamEvent event;
     private long relativeTime;
+    private String sourceId;
 
-    public MultiSourceEventWrapper(StreamEvent event, long relativeTime) {
+    public MultiSourceEventWrapper(String sourceId, StreamEvent event, long relativeTime) {
         this.event = event;
         this.relativeTime = relativeTime;
+        this.sourceId = sourceId;
     }
 
     public StreamEvent getEvent() {
         return event;
     }
 
-    public long getRelativeTime() {
-        return relativeTime;
+    public String getSourceId() {
+        return sourceId;
+    }
+
+    @Override
+    public int compareTo(MultiSourceEventWrapper sourceEventWrapper) {
+        if (this.relativeTime > sourceEventWrapper.relativeTime) {
+            return 1;
+        } else if (this.relativeTime < sourceEventWrapper.relativeTime) {
+            return -1;
+        } else {
+            return 0;
+        }
     }
 }

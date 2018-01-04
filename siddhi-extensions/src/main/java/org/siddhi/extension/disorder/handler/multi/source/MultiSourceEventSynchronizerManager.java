@@ -17,6 +17,9 @@
 */
 package org.siddhi.extension.disorder.handler.multi.source;
 
+import org.siddhi.extension.disorder.handler.EventSource;
+import org.wso2.siddhi.core.query.processor.Processor;
+
 import java.util.HashMap;
 
 public class MultiSourceEventSynchronizerManager {
@@ -31,19 +34,21 @@ public class MultiSourceEventSynchronizerManager {
         return instance;
     }
 
-    private synchronized MultiSourceEventSynchronizer addMultiSourceEventSynchronizer(String streamId) {
+    private synchronized MultiSourceEventSynchronizer addMultiSourceEventSynchronizer(String streamId,
+                                                                                      Processor processor) {
         MultiSourceEventSynchronizer synchronizer = this.synchronizers.get(streamId);
         if (synchronizer == null) {
-            synchronizer = new MultiSourceEventSynchronizer();
+            synchronizer = new MultiSourceEventSynchronizer(processor);
             this.synchronizers.put(streamId, synchronizer);
         }
         return synchronizer;
     }
 
-    public MultiSourceEventSynchronizer getMultiSourceEventSynchronizer(String streamId) {
+    public MultiSourceEventSynchronizer getMultiSourceEventSynchronizer(String streamId,
+                                                                        Processor nextProcessor) {
         MultiSourceEventSynchronizer synchronizer = this.synchronizers.get(streamId);
         if (synchronizer == null) {
-            synchronizer = addMultiSourceEventSynchronizer(streamId);
+            synchronizer = addMultiSourceEventSynchronizer(streamId, nextProcessor);
         }
         return synchronizer;
     }
