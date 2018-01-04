@@ -85,9 +85,10 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                         if (source == null) {
                             source = new EventSource(sourceId, timestampExecutor);
                             sourceHashMap.put(sourceId, source);
-                            this.synchronizer.putTimeout(sourceId, getTimeout(source));
+                            this.synchronizer.putEventSource(sourceId, source);
                         }
-                        long expiryTimestamp = System.currentTimeMillis() + getTimeout(source);
+                        long expiryTimestamp = System.currentTimeMillis() +
+                                Utils.getTimeout(userDefinedTimeout, source);
                         boolean[] response = source.isInOrder(event, sequenceNumber, expiryTimestamp);
                         if (response[0]) {
                             this.synchronizer.putEvent(sourceId, event, getEventTime(event));
@@ -111,11 +112,6 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
         }
     }
 
-    private long getTimeout(EventSource source){
-        return Math.min(userDefinedTimeout, Math.max(source.getAverageInoderEventArrivalInterval(),
-                source.getBufferedEventsDelay()));
-    }
-
     private long getEventTime(StreamEvent event) {
         long currentEventTimestamp = event.getTimestamp();
         if (timestampExecutor != null) {
@@ -127,9 +123,6 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     @Override
     protected List<Attribute> init(AbstractDefinition abstractDefinition, ExpressionExecutor[] expressionExecutors,
                                    ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
-        this.synchronizer = MultiSourceEventSynchronizerManager.getInstance().
-                getMultiSourceEventSynchronizer(abstractDefinition.getId(), getNextProcessor());
-
         if (attributeExpressionLength > 4) {
             throw new SiddhiAppCreationException("Maximum allowed expressions to sequence based reorder extension is 4!" +
                     " But found - " + attributeExpressionLength);
@@ -212,6 +205,8 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                         + expressionExecutors[3].getReturnType());
             }
         }
+        this.synchronizer = MultiSourceEventSynchronizerManager.getInstance().
+                getMultiSourceEventSynchronizer(abstractDefinition.getId(), getNextProcessor(), userDefinedTimeout);
         return new ArrayList<>();
     }
 

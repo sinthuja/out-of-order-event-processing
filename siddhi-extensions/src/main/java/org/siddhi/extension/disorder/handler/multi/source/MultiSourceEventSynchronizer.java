@@ -32,11 +32,13 @@ import java.util.concurrent.Executors;
 public class MultiSourceEventSynchronizer {
     private Map<String, ConcurrentLinkedQueue<MultiSourceEventWrapper>> sourceBasedStreams = new HashMap<>();
     private Processor nextProcessor;
-    private Map<String, Long> eventStreamTimeout = new HashMap<>();
+    private Map<String, EventSource> eventStreamTimeout = new HashMap<>();
+    private long userDefinedTimeout;
 
-    MultiSourceEventSynchronizer(Processor nextProcessor) {
+    MultiSourceEventSynchronizer(Processor nextProcessor, long userDefinedTimeout) {
         this.nextProcessor = nextProcessor;
         Executors.newSingleThreadExecutor().submit(new MultiSourceEventSynchronizingWorker());
+        this.userDefinedTimeout = userDefinedTimeout;
     }
 
     public void putEvent(String sourceId, StreamEvent streamEvent, long eventTime) {
@@ -112,7 +114,7 @@ public class MultiSourceEventSynchronizer {
                 nextProcessor.process(complexEventChunk);
                 complexEventChunk = new ComplexEventChunk<>(null, null, true);
                 try {
-                    Thread.sleep(eventStreamTimeout.get(sourceId));
+                    Thread.sleep(Utils.getTimeout(userDefinedTimeout, eventStreamTimeout.get(sourceId)));
                 } catch (InterruptedException ignored) {
                 }
                 eventWrapper = queue.poll();
@@ -123,7 +125,7 @@ public class MultiSourceEventSynchronizer {
         }
     }
 
-    public void putTimeout(String sourceId, long timeout){
-        this.eventStreamTimeout.put(sourceId, timeout);
+    public void putEventSource(String sourceId, EventSource eventSource) {
+        this.eventStreamTimeout.put(sourceId, eventSource);
     }
 }
