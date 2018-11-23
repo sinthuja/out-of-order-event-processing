@@ -54,6 +54,7 @@ public class MultiSourceEventSynchronizer {
         if (streamPipe.getLast().getSequenceNumber() < sequenceNumber) {
             streamPipe.add(eventWrapper);
         } else {
+            //Add the event in the most corrrect position.
             synchronized (linkedListLock) {
                 int index = 0;
                 for (MultiSourceEventWrapper element : streamPipe) {

@@ -176,7 +176,8 @@ public class TimeBatchWindowTestCase {
                 "from cseEventStream#reorder:timeBatch(1 sec, 0, 10 milliseconds, false, true) " +
                 "select symbol, sum(ifThenElse(windowType=='LOW',price, 0.0f)) as sumLowPrice , " +
                 "sum(ifThenElse(windowType=='MIDDLE',price, 0.0f)) as sumMiddlePrice, " +
-                "sum(ifThenElse(windowType=='HIGH',price, 0.0f)) as sumHighPrice, " +
+                "sum(ifThenElse(windowType=='HIGH',price, 0.0f)) as sumHighPrice," +
+                "sum(ifThenElse(windowType=='FULL',price, 0.0f)) as sumFullPrice, " +
                 "volume, windowType " +
                 "insert all events into outputStream;";
 

@@ -118,7 +118,9 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                                 this.synchronizer.putEvent(source.getName(), eventWrapper, complexEventPopulater);
                                 //Events released from timeout, without meeting the next expected sequence number,
                                 // therefore enabled MissingEvent property therefore the windows will be stored.
-                                this.synchronizer.setMissingEvent(true);
+                                if (!this.dropIfSeqNumAlreadyPassed) {
+                                    this.synchronizer.setMissingEvent(true);
+                                }
                             }
                         }
                     }

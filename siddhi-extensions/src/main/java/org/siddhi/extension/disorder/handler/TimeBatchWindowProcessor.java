@@ -17,6 +17,7 @@
  */
 package org.siddhi.extension.disorder.handler;
 
+import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizer;
 import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizerManager;
 import org.siddhi.extension.disorder.handler.storage.WindowStateStore;
 import org.wso2.siddhi.annotation.Example;
@@ -99,6 +100,7 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
     private boolean emitImmediate = false;
     private boolean sendFullWindow = false;
     private WindowStateStore windowStateStore = new WindowStateStore();
+    private MultiSourceEventSynchronizer eventSynchronizer;
 
     @Override
     public Scheduler getScheduler() {
@@ -115,6 +117,8 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
                                    ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
         this.siddhiAppContext = siddhiAppContext;
         this.streamId = abstractDefinition.getId();
+        this.eventSynchronizer = MultiSourceEventSynchronizerManager.getInstance()
+                .getMultiSourceEventSynchronizer(this.streamId);
         if (attributeExpressionExecutors.length == 1) {
             checkFirstParameter();
         } else if (attributeExpressionExecutors.length == 2) {
@@ -164,8 +168,7 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
             //TODO: load the uncertain time dynamically after each expiry.
             long uncertainWindowBuffer;
             if (uncertainWindowRange == -1) {
-                uncertainWindowBuffer = MultiSourceEventSynchronizerManager.getInstance().
-                        getMultiSourceEventSynchronizer(this.streamId).getUncertainTimeRange();
+                uncertainWindowBuffer = this.eventSynchronizer.getUncertainTimeRange();
             } else {
                 uncertainWindowBuffer = this.uncertainWindowRange;
             }
@@ -224,8 +227,8 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
         if (complexEventChunk != null && complexEventChunk.getFirst() != null) {
             complexEventChunk.setBatch(true);
             nextProcessor.process(complexEventChunk);
-            if (MultiSourceEventSynchronizerManager.getInstance().
-                    getMultiSourceEventSynchronizer(this.streamId).isMissingEvent()) {
+            if (eventSynchronizer != null &&
+                    eventSynchronizer.isMissingEvent()) {
                 windowStateStore.storeState(currentTime, currentState());
             }
         }
