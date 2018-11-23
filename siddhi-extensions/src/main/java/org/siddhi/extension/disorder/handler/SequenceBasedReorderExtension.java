@@ -1,23 +1,25 @@
 /*
-*  Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
-*  WSO2 Inc. licenses this file to you under the Apache License,
-*  Version 2.0 (the "License"); you may not use this file except
-*  in compliance with the License.
-*  You may obtain a copy of the License at
-*
-*    http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing,
-* software distributed under the License is distributed on an
-* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-* KIND, either express or implied.  See the License for the
-* specific language governing permissions and limitations
-* under the License.
-*
-*/
+ *  Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *  WSO2 Inc. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
 package org.siddhi.extension.disorder.handler;
 
 import org.apache.log4j.Logger;
+import org.siddhi.extension.disorder.handler.exception.SequenceNumberAlreadyPassedException;
+import org.siddhi.extension.disorder.handler.exception.UnsupportedParameterException;
 import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizer;
 import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizerManager;
 import org.siddhi.extension.disorder.handler.synchronization.TCPNettySyncServer;
@@ -64,6 +66,7 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     private long userDefinedTimeout = DEFAULT_TIMEOUT_MILLI_SEC;
     private Scheduler scheduler;
     private MultiSourceEventSynchronizer synchronizer;
+    private boolean dropIfSeqNumAlreadyPassed = true;
 
     private HashMap<String, EventSource> sourceHashMap = new HashMap<>();
 
@@ -89,20 +92,34 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                         }
                         long expiryTimestamp = System.currentTimeMillis() +
                                 Utils.getTimeout(userDefinedTimeout, source);
-                        boolean[] response = source.isInOrder(event, sequenceNumber, expiryTimestamp);
-                        if (response[0]) {
-                            this.synchronizer.putEvent(sourceId, event, getEventTime(event));
-                            if (response[1]) {
-                                this.synchronizer.putEvent(sourceId, source.checkAndReleaseBufferedEvents());
+                        try {
+                            boolean[] response = source.isInOrder(event, sequenceNumber, expiryTimestamp);
+                            if (response[0]) {
+                                this.synchronizer.putEvent(sourceId, event, getEventTime(event),
+                                        sequenceNumber, complexEventPopulater);
+                                if (response[1]) {
+                                    this.synchronizer.putEvent(sourceId, source.checkAndReleaseBufferedEvents(), complexEventPopulater);
+                                }
+                            } else {
+                                scheduler.notifyAt(expiryTimestamp);
                             }
-                        } else {
-                            scheduler.notifyAt(expiryTimestamp);
+                        } catch (SequenceNumberAlreadyPassedException ex) {
+                            if (!this.dropIfSeqNumAlreadyPassed) {
+                                this.synchronizer.putEvent(sourceId, event, getEventTime(event), sequenceNumber,
+                                        complexEventPopulater);
+                            }
                         }
                     } else {
                         long currentTimestamp = System.currentTimeMillis();
                         for (String s : sourceHashMap.keySet()) {
                             EventSource source = sourceHashMap.get(s);
-                            this.synchronizer.putEvent(source.getName(), source.releaseTimeoutBufferedEvents(currentTimestamp));
+                            List<StreamEventWrapper> eventWrapper = source.releaseTimeoutBufferedEvents(currentTimestamp);
+                            if (eventWrapper != null && !eventWrapper.isEmpty()) {
+                                this.synchronizer.putEvent(source.getName(), eventWrapper, complexEventPopulater);
+                                //Events released from timeout, without meeting the next expected sequence number,
+                                // therefore enabled MissingEvent property therefore the windows will be stored.
+                                this.synchronizer.setMissingEvent(true);
+                            }
                         }
                     }
                 } catch (UnsupportedParameterException e) {
@@ -123,92 +140,99 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     @Override
     protected List<Attribute> init(AbstractDefinition abstractDefinition, ExpressionExecutor[] expressionExecutors,
                                    ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
-        if (attributeExpressionLength > 4) {
-            throw new SiddhiAppCreationException("Maximum allowed expressions to sequence based reorder extension is 4!" +
+        if (attributeExpressionLength > 5) {
+            throw new SiddhiAppCreationException("Maximum allowed expressions to sequence based reorder extension is 5!" +
                     " But found - " + attributeExpressionLength);
-        }
-
-        if (attributeExpressionLength == 1) {
+        } else if (attributeExpressionLength <= 1) {
             throw new SiddhiAppCreationException("Minimum number of attributes is 2, those are Source ID and Sequence " +
                     "number fields of the stream. " +
                     "But only found 1 attribute.");
         } else if (attributeExpressionLength == 2) {
-            if (expressionExecutors[0].getReturnType() == Attribute.Type.STRING) {
-                sourceIdExecutor = expressionExecutors[0];
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with String return type for the Source ID field," +
-                        "but found a field with return type - " + expressionExecutors[0].getReturnType());
-            }
-            if (expressionExecutors[1].getReturnType() == Attribute.Type.LONG) {
-                sequenceNumberExecutor = expressionExecutors[1];
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with Long return type for the Sequence Number field," +
-                        "but found a field with return type - " + expressionExecutors[1].getReturnType());
-            }
+            checkFirstParameter(expressionExecutors);
+            checkSecondParameter(expressionExecutors);
         } else if (attributeExpressionLength == 3) {
-            if (expressionExecutors[0].getReturnType() == Attribute.Type.STRING) {
-                sourceIdExecutor = expressionExecutors[0];
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with String return type for the Source ID field," +
-                        "but found a field with return type - " + expressionExecutors[0].getReturnType());
-            }
-            if (expressionExecutors[1].getReturnType() == Attribute.Type.LONG) {
-                sequenceNumberExecutor = expressionExecutors[1];
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with Long return type for the Sequence Number field," +
-                        "but found a field with return type - " + expressionExecutors[1].getReturnType());
-            }
-            if (expressionExecutors[2].getReturnType() == Attribute.Type.LONG) {
-                if (expressionExecutors[2] instanceof ConstantExpressionExecutor) {
-                    userDefinedTimeout = (Long) expressionExecutors[2].execute(null);
-                } else {
-                    timestampExecutor = expressionExecutors[2];
-                }
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with Long return type as timestamp field " +
-                        "or Long constant for the userDefinedTimeout field, "
-                        + "but found a field with return type - " + expressionExecutors[2].getReturnType());
-            }
+            checkFirstParameter(expressionExecutors);
+            checkSecondParameter(expressionExecutors);
+            checkThirdParameter(expressionExecutors);
+        } else if (attributeExpressionLength == 4) {
+            checkFirstParameter(expressionExecutors);
+            checkSecondParameter(expressionExecutors);
+            checkThirdParameter(expressionExecutors);
+            checkFourthParameter(expressionExecutors);
         } else {
-            if (expressionExecutors[0].getReturnType() == Attribute.Type.STRING) {
-                sourceIdExecutor = expressionExecutors[0];
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with String return type for the Source ID field, " +
-                        "but found a field with return type - " + expressionExecutors[0].getReturnType());
-            }
-
-            if (expressionExecutors[1].getReturnType() == Attribute.Type.LONG) {
-                sequenceNumberExecutor = expressionExecutors[1];
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with Long return type for the Sequence Number field," +
-                        "but found a field with return type - " + expressionExecutors[1].getReturnType());
-            }
-
-            if (expressionExecutors[2].getReturnType() == Attribute.Type.LONG) {
-                if (!(expressionExecutors[2] instanceof ConstantExpressionExecutor)) {
-                    timestampExecutor = expressionExecutors[2];
-                } else {
-                    throw new SiddhiAppCreationException("Expected a field with Long return type as timestamp field, but found a constant");
-                }
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with Long return type but found a field with - "
-                        + expressionExecutors[2].getReturnType());
-            }
-            if (expressionExecutors[3].getReturnType() == Attribute.Type.LONG) {
-                if (expressionExecutors[3] instanceof ConstantExpressionExecutor) {
-                    userDefinedTimeout = (Long) expressionExecutors[3].execute(null);
-                } else {
-                    throw new SiddhiAppCreationException("Expected Long constant for the userDefinedTimeout field, but non constant field found");
-                }
-            } else {
-                throw new SiddhiAppCreationException("Expected a field with Long return type but found a field with - "
-                        + expressionExecutors[3].getReturnType());
-            }
+            checkFirstParameter(expressionExecutors);
+            checkSecondParameter(expressionExecutors);
+            checkThirdParameter(expressionExecutors);
+            checkFourthParameter(expressionExecutors);
+            checkFifthParameter(expressionExecutors);
         }
         this.synchronizer = MultiSourceEventSynchronizerManager.getInstance().
                 getMultiSourceEventSynchronizer(abstractDefinition.getId(), getNextProcessor(), userDefinedTimeout);
-        return new ArrayList<>();
+        List<Attribute> eventAttribute = new ArrayList<>();
+        eventAttribute.add(new Attribute(Constants.RELATIVE_TIMETSAMP_ATTRIBUTE, Attribute.Type.LONG));
+        return eventAttribute;
     }
+
+    private void checkFirstParameter(ExpressionExecutor[] expressionExecutors) {
+        if (expressionExecutors[0].getReturnType() == Attribute.Type.STRING) {
+            sourceIdExecutor = expressionExecutors[0];
+        } else {
+            throw new SiddhiAppCreationException("Expected a field with String return type for the Source ID field," +
+                    "but found a field with return type - " + expressionExecutors[0].getReturnType());
+        }
+    }
+
+    private void checkSecondParameter(ExpressionExecutor[] expressionExecutors) {
+        if (expressionExecutors[1].getReturnType() == Attribute.Type.LONG) {
+            sequenceNumberExecutor = expressionExecutors[1];
+        } else {
+            throw new SiddhiAppCreationException("Expected a field with Long return type for the Sequence Number field," +
+                    "but found a field with return type - " + expressionExecutors[1].getReturnType());
+        }
+    }
+
+    private void checkThirdParameter(ExpressionExecutor[] expressionExecutors) {
+        if (expressionExecutors[2].getReturnType() == Attribute.Type.LONG) {
+            if (expressionExecutors[2] instanceof ConstantExpressionExecutor) {
+                userDefinedTimeout = (Long) expressionExecutors[2].execute(null);
+            } else {
+                timestampExecutor = expressionExecutors[2];
+            }
+        } else {
+            throw new SiddhiAppCreationException("Expected a field with Long return type as timestamp field " +
+                    "or Long constant for the userDefinedTimeout field, "
+                    + "but found a field with return type - " + expressionExecutors[2].getReturnType());
+        }
+    }
+
+    private void checkFourthParameter(ExpressionExecutor[] expressionExecutors) {
+        if (expressionExecutors[3].getReturnType() == Attribute.Type.LONG) {
+            if (expressionExecutors[3] instanceof ConstantExpressionExecutor) {
+                userDefinedTimeout = (Long) expressionExecutors[3].execute(null);
+            } else {
+                throw new SiddhiAppCreationException("Expected Long constant for the userDefinedTimeout field, but non constant field found");
+            }
+        } else {
+            throw new SiddhiAppCreationException("Expected a field with Long return type but found a field with - "
+                    + expressionExecutors[3].getReturnType());
+        }
+    }
+
+    private void checkFifthParameter(ExpressionExecutor[] expressionExecutors) {
+        if (expressionExecutors[4].getReturnType() == Attribute.Type.BOOL) {
+            if (expressionExecutors[4] instanceof ConstantExpressionExecutor) {
+                this.dropIfSeqNumAlreadyPassed = (Boolean) expressionExecutors[4].execute(null);
+            } else {
+                throw new SiddhiAppCreationException("Expected boolean constant for the " +
+                        "field - DropIfSequenceNumberAlreadyPassed, but non constant field found");
+            }
+        } else {
+            throw new SiddhiAppCreationException("Expected a field with Boolean return type for the " +
+                    "DropIfSequenceNumberAlreadyPassed field," +
+                    "but found a field with return type - " + expressionExecutors[1].getReturnType());
+        }
+    }
+
 
     @Override
     public void start() {

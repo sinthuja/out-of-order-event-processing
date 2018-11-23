@@ -38,6 +38,7 @@ public final class Constants {
     public static final int WARM_UP_TIME_SYNC_ATTEMPTS = 5;
 
     public static final String WINDOW_TYPE_ATTRIBUTE = "windowType";
+    public static final String RELATIVE_TIMETSAMP_ATTRIBUTE = "relativeTimestamp";
 
     private Constants() {
 

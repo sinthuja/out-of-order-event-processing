@@ -18,6 +18,7 @@
 package org.siddhi.extension.disorder.handler;
 
 import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizerManager;
+import org.siddhi.extension.disorder.handler.storage.WindowStateStore;
 import org.wso2.siddhi.annotation.Example;
 import org.wso2.siddhi.annotation.Extension;
 import org.wso2.siddhi.annotation.Parameter;
@@ -97,6 +98,7 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
     private Map<TimeBatchWindow.Type, ComplexEventChunk<StreamEvent>> sendToNextReady = new HashMap<>();
     private boolean emitImmediate = false;
     private boolean sendFullWindow = false;
+    private WindowStateStore windowStateStore = new WindowStateStore();
 
     @Override
     public Scheduler getScheduler() {
@@ -149,6 +151,7 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
                     attributeExpressionExecutors.length + " input " +
                     "attributes");
         }
+
         ArrayList<Attribute> attributes = new ArrayList<>();
         attributes.add(new Attribute(Constants.WINDOW_TYPE_ATTRIBUTE, Attribute.Type.STRING));
         return attributes;
@@ -194,7 +197,7 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
                 ComplexEventChunk<StreamEvent> streamEventAfterWindow = window.process(streamEventChunk,
                         streamEventCloner, currentTime);
                 if (emitImmediate) {
-                    this.sendToNextProcessor(streamEventAfterWindow);
+                    this.sendToNextProcessor(streamEventAfterWindow, currentTime);
                 } else if (streamEventAfterWindow != null) {
                     this.sendToNextReady.put(window.getType(), streamEventAfterWindow);
                 }
@@ -209,7 +212,7 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
                     this.sendToNextReady.get(TimeBatchWindow.Type.LOW).
                             add(this.sendToNextReady.get(TimeBatchWindow.Type.FULL).getFirst());
                 }
-                this.sendToNextProcessor(this.sendToNextReady.get(TimeBatchWindow.Type.LOW));
+                this.sendToNextProcessor(this.sendToNextReady.get(TimeBatchWindow.Type.LOW), currentTime);
                 this.sendToNextReady.clear();
             }
 
@@ -217,10 +220,14 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
         }
     }
 
-    private void sendToNextProcessor(ComplexEventChunk<StreamEvent> complexEventChunk) {
+    private void sendToNextProcessor(ComplexEventChunk<StreamEvent> complexEventChunk, long currentTime) {
         if (complexEventChunk != null && complexEventChunk.getFirst() != null) {
             complexEventChunk.setBatch(true);
             nextProcessor.process(complexEventChunk);
+            if (MultiSourceEventSynchronizerManager.getInstance().
+                    getMultiSourceEventSynchronizer(this.streamId).isMissingEvent()) {
+                windowStateStore.storeState(currentTime, currentState());
+            }
         }
     }
 

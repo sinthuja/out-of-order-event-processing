@@ -18,6 +18,8 @@
 package org.siddhi.extension.disorder.handler;
 
 import org.apache.log4j.Logger;
+import org.siddhi.extension.disorder.handler.exception.SequenceNumberAlreadyPassedException;
+import org.siddhi.extension.disorder.handler.exception.UnsupportedParameterException;
 import org.wso2.siddhi.core.event.stream.StreamEvent;
 import org.wso2.siddhi.core.executor.ExpressionExecutor;
 
@@ -70,7 +72,7 @@ public class EventSource {
         this.timeoutReleasedEvents = new TreeMap<>();
     }
 
-    boolean[] isInOrder(StreamEvent event, long sequenceNumber, long expiryTimestamp) {
+    boolean[] isInOrder(StreamEvent event, long sequenceNumber, long expiryTimestamp) throws SequenceNumberAlreadyPassedException {
         boolean[] inOrderResponse = new boolean[2]; // 1st element - inOrderOrNot, 2nd Element - whether can flush bufferedEevnts
         long expectedNextSeqNumber = lastSequenceNumber.get() + 1;
         if (sequenceNumber == expectedNextSeqNumber) {
@@ -87,6 +89,8 @@ public class EventSource {
                 timeoutBuffer.put(expiryTimestamp, seqNumList);
             }
         } else {
+            String msg = "Expected Sequence number " + expectedNextSeqNumber + " is greater than received sequence number "
+                    + sequenceNumber;
             log.error("Expected Sequence number " + expectedNextSeqNumber + " is greater than received sequence number "
                     + sequenceNumber);
             long currentTime =  System.currentTimeMillis();
@@ -101,6 +105,7 @@ public class EventSource {
                     }
                 }
             }
+            throw new SequenceNumberAlreadyPassedException(msg);
         }
         return inOrderResponse;
     }

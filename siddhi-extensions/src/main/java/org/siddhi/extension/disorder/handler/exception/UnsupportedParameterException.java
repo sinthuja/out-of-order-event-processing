@@ -15,7 +15,7 @@
 * under the License.
 *
 */
-package org.siddhi.extension.disorder.handler;
+package org.siddhi.extension.disorder.handler.exception;
 
 public class UnsupportedParameterException extends Exception {
 
