@@ -174,15 +174,19 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
                     nextEmitTime = siddhiAppContext.getTimestampGenerator().currentTime() + timeInMilliSeconds;
                 }
                 this.windows.add(new TimeBatchWindow(nextEmitTime - uncertainWindowBuffer,
-                        timeInMilliSeconds, outputExpectsExpiredEvents,
+                        0, timeInMilliSeconds, outputExpectsExpiredEvents,
                         complexEventPopulater, scheduler, TimeBatchWindow.Type.LOW));
-                this.windows.add(new TimeBatchWindow(nextEmitTime, timeInMilliSeconds,
+                this.windows.add(new TimeBatchWindow(nextEmitTime, 0, timeInMilliSeconds,
                         outputExpectsExpiredEvents, complexEventPopulater,
                         scheduler, TimeBatchWindow.Type.MIDDLE));
                 this.windows.add(new TimeBatchWindow(nextEmitTime + uncertainWindowBuffer,
-                        timeInMilliSeconds, outputExpectsExpiredEvents, complexEventPopulater,
+                        0, timeInMilliSeconds, outputExpectsExpiredEvents, complexEventPopulater,
                         scheduler, TimeBatchWindow.Type.HIGH));
-                //TODO: Create overlapping window.
+                if (this.sendFullWindow) {
+                    this.windows.add(new TimeBatchWindow(nextEmitTime + uncertainWindowBuffer,
+                            2 * uncertainWindowBuffer, timeInMilliSeconds, outputExpectsExpiredEvents,
+                            complexEventPopulater, scheduler, TimeBatchWindow.Type.FULL));
+                }
             }
             long currentTime = siddhiAppContext.getTimestampGenerator().currentTime();
             for (TimeBatchWindow window : windows) {
@@ -201,6 +205,10 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
                         add(this.sendToNextReady.get(TimeBatchWindow.Type.MIDDLE).getFirst());
                 this.sendToNextReady.get(TimeBatchWindow.Type.LOW).
                         add(this.sendToNextReady.get(TimeBatchWindow.Type.HIGH).getFirst());
+                if (sendFullWindow) {
+                    this.sendToNextReady.get(TimeBatchWindow.Type.LOW).
+                            add(this.sendToNextReady.get(TimeBatchWindow.Type.FULL).getFirst());
+                }
                 this.sendToNextProcessor(this.sendToNextReady.get(TimeBatchWindow.Type.LOW));
                 this.sendToNextReady.clear();
             }
@@ -285,7 +293,7 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
 
     private void checkFifthParameter() {
         if (attributeExpressionExecutors[4].getReturnType() == Attribute.Type.BOOL) {
-            emitImmediate = (Boolean) ((ConstantExpressionExecutor) attributeExpressionExecutors[4]).getValue();
+            sendFullWindow = (Boolean) ((ConstantExpressionExecutor) attributeExpressionExecutors[4]).getValue();
         }
     }
 

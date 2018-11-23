@@ -31,23 +31,31 @@ public class TimeBatchWindow {
     private long timeInMilliSeconds;
     private ComplexEventChunk<StreamEvent> currentEventChunk = new ComplexEventChunk<>(false);
     private ComplexEventChunk<StreamEvent> expiredEventChunk = null;
+    private ComplexEventChunk<StreamEvent> nextExpiredEventChunk = null;
     private Scheduler scheduler;
     private boolean outputExpectsExpiredEvents;
     private StreamEvent resetEvent = null;
     private long nextEmitTime;
     private Type type;
     private ComplexEventPopulater complexEventPopulater;
+    private int lastIndexOfCurrentEventToExpire = -1;
+    private long overLappingTime;
 
 
-    TimeBatchWindow(long nextEmitTime, long timeInMilliSeconds, boolean outputExpectsExpiredEvents,
+    TimeBatchWindow(long nextEmitTime, long overLappingTime, long timeInMilliSeconds,
+                    boolean outputExpectsExpiredEvents,
                     ComplexEventPopulater complexEventPopulater,
                     Scheduler scheduler, Type type) {
         this.nextEmitTime = nextEmitTime;
         this.timeInMilliSeconds = timeInMilliSeconds;
         this.complexEventPopulater = complexEventPopulater;
         this.outputExpectsExpiredEvents = outputExpectsExpiredEvents;
+        this.overLappingTime = overLappingTime;
         if (this.outputExpectsExpiredEvents) {
             this.expiredEventChunk = new ComplexEventChunk<>(false);
+            if (this.overLappingTime > 0) {
+                this.nextExpiredEventChunk = new ComplexEventChunk<>(false);
+            }
         }
         this.scheduler = scheduler;
         this.scheduler.notifyAt(this.nextEmitTime);
@@ -58,6 +66,11 @@ public class TimeBatchWindow {
     public ComplexEventChunk<StreamEvent> process(ComplexEventChunk<StreamEvent> streamEventChunk,
                                                   StreamEventCloner streamEventCloner, long currentTime) {
         synchronized (this) {
+            boolean isAddToExpire = true;
+            if (this.nextExpiredEventChunk != null && currentTime > this.nextEmitTime - this.overLappingTime) {
+                isAddToExpire = false;
+            }
+
             boolean sendEvents;
             if (currentTime >= nextEmitTime) {
                 nextEmitTime += timeInMilliSeconds;
@@ -75,6 +88,9 @@ public class TimeBatchWindow {
                 StreamEvent clonedStreamEvent = streamEventCloner.copyStreamEvent(streamEvent);
                 complexEventPopulater.populateComplexEvent(clonedStreamEvent, new Object[]{this.type.toString()});
                 currentEventChunk.add(clonedStreamEvent);
+                if (this.nextExpiredEventChunk != null && isAddToExpire) {
+                    lastIndexOfCurrentEventToExpire++;
+                }
             }
             if (sendEvents) {
                 ComplexEventChunk<StreamEvent> sendingStreamEventChunk
@@ -100,11 +116,25 @@ public class TimeBatchWindow {
 
                     if (expiredEventChunk != null) {
                         currentEventChunk.reset();
+                        if (this.nextExpiredEventChunk != null && this.nextExpiredEventChunk.getFirst() != null) {
+                            this.expiredEventChunk.add(this.nextExpiredEventChunk.getFirst());
+                            this.nextExpiredEventChunk.clear();
+                        }
+                        int currentChunkIndex = -1;
                         while (currentEventChunk.hasNext()) {
                             StreamEvent currentEvent = currentEventChunk.next();
                             StreamEvent toExpireEvent = streamEventCloner.copyStreamEvent(currentEvent);
                             toExpireEvent.setType(StreamEvent.Type.EXPIRED);
-                            expiredEventChunk.add(toExpireEvent);
+                            if (this.nextExpiredEventChunk != null) {
+                                currentChunkIndex++;
+                                if (currentChunkIndex <= lastIndexOfCurrentEventToExpire) {
+                                    expiredEventChunk.add(toExpireEvent);
+                                } else {
+                                    nextExpiredEventChunk.add(toExpireEvent);
+                                }
+                            } else {
+                                this.expiredEventChunk.add(toExpireEvent);
+                            }
                         }
                     }
 
@@ -113,6 +143,7 @@ public class TimeBatchWindow {
                     sendingStreamEventChunk.add(currentEventChunk.getFirst());
                 }
                 currentEventChunk.clear();
+                lastIndexOfCurrentEventToExpire = -1;
                 return sendingStreamEventChunk;
             }
             return null;
@@ -122,6 +153,7 @@ public class TimeBatchWindow {
     public void storeCurrentState(Map<String, Object> state) {
         state.put("CurrentEventChunk:" + this.type, currentEventChunk.getFirst());
         state.put("ExpiredEventChunk:" + this.type, expiredEventChunk != null ? expiredEventChunk.getFirst() : null);
+        state.put("NextExpiredEventChunk:" + this.type, nextExpiredEventChunk != null ? nextExpiredEventChunk.getFirst() : null);
         state.put("ResetEvent:" + this.type, resetEvent);
     }
 
@@ -129,6 +161,10 @@ public class TimeBatchWindow {
         if (expiredEventChunk != null) {
             expiredEventChunk.clear();
             expiredEventChunk.add((StreamEvent) state.get("ExpiredEventChunk:" + this.type));
+        }
+        if (nextExpiredEventChunk != null) {
+            nextExpiredEventChunk.clear();
+            nextExpiredEventChunk.add((StreamEvent) state.get("NextExpiredEventChunk:" + this.type));
         }
         currentEventChunk.clear();
         currentEventChunk.add((StreamEvent) state.get("CurrentEventChunk:" + this.type));
@@ -140,6 +176,6 @@ public class TimeBatchWindow {
     }
 
     public enum Type {
-        LOW, MIDDLE, HIGH
+        LOW, MIDDLE, HIGH, FULL
     }
 }
