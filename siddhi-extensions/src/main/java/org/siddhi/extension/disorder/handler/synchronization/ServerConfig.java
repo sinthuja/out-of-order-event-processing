@@ -19,18 +19,18 @@
 package org.siddhi.extension.disorder.handler.synchronization;
 
 
-import org.siddhi.extension.disorder.handler.Constant;
+import org.siddhi.extension.disorder.handler.Constants;
 
 /**
  * TCP ServerConfig.
  */
 public class ServerConfig {
-    private int receiverThreads = Constant.DEFAULT_RECEIVER_THREADS;
-    private int workerThreads = Constant.DEFAULT_WORKER_THREADS;
-    private int port = Constant.DEFAULT_PORT;
-    private String host = Constant.DEFAULT_HOST;
-    private boolean tcpNoDelay = Constant.DEFAULT_TCP_NO_DELAY;
-    private boolean keepAlive = Constant.DEFAULT_KEEP_ALIVE;
+    private int receiverThreads = Constants.DEFAULT_RECEIVER_THREADS;
+    private int workerThreads = Constants.DEFAULT_WORKER_THREADS;
+    private int port = Constants.DEFAULT_PORT;
+    private String host = Constants.DEFAULT_HOST;
+    private boolean tcpNoDelay = Constants.DEFAULT_TCP_NO_DELAY;
+    private boolean keepAlive = Constants.DEFAULT_KEEP_ALIVE;
 
     public int getReceiverThreads() {
         return receiverThreads;

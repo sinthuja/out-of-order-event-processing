@@ -1,20 +1,20 @@
 /*
-*  Copyright (c) 2018, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
-*  WSO2 Inc. licenses this file to you under the Apache License,
-*  Version 2.0 (the "License"); you may not use this file except
-*  in compliance with the License.
-*  You may obtain a copy of the License at
-*
-*    http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing,
-* software distributed under the License is distributed on an
-* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-* KIND, either express or implied.  See the License for the
-* specific language governing permissions and limitations
-* under the License.
-*
-*/
+ *  Copyright (c) 2018, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *  WSO2 Inc. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
 package org.siddhi.extension.disorder.handler.multi.source;
 
 import org.wso2.siddhi.core.event.ComplexEventChunk;
@@ -23,8 +23,10 @@ import org.siddhi.extension.disorder.handler.*;
 import org.wso2.siddhi.core.query.processor.Processor;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
@@ -34,6 +36,7 @@ public class MultiSourceEventSynchronizer {
     private Processor nextProcessor;
     private Map<String, EventSource> eventStreamTimeout = new HashMap<>();
     private long userDefinedTimeout;
+    private Set<String> eventSources = new HashSet<>();
 
     MultiSourceEventSynchronizer(Processor nextProcessor, long userDefinedTimeout) {
         this.nextProcessor = nextProcessor;
@@ -44,6 +47,7 @@ public class MultiSourceEventSynchronizer {
     public void putEvent(String sourceId, StreamEvent streamEvent, long eventTime) {
         ConcurrentLinkedQueue<MultiSourceEventWrapper> streamPipe = getStreamPipe(sourceId);
         long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
+        this.eventSources.add(sourceId);
         streamPipe.add(new MultiSourceEventWrapper(sourceId, streamEvent, eventTime + drift));
     }
 
@@ -68,6 +72,17 @@ public class MultiSourceEventSynchronizer {
             streamPipe.add(new MultiSourceEventWrapper(sourceId, eventWrapper.getStreamEvent(),
                     eventWrapper.getEventTime() + drift));
         }
+    }
+
+    public long getUncertainTimeRange() {
+        long delay = 0;
+        for (String sourceId : this.eventSources) {
+            long eventSourceDelay = EventSourceDriftHolder.getInstance().getTransportDelay(sourceId);
+            if (eventSourceDelay > delay){
+                delay = eventSourceDelay;
+            }
+        }
+        return delay;
     }
 
     public class MultiSourceEventSynchronizingWorker extends Thread {

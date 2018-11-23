@@ -21,7 +21,7 @@ package org.siddhi.extension.disorder.handler;
 /**
  * Constants for tcp transport.
  */
-public final class Constant {
+public final class Constants {
 
     public static final String DEFAULT_CHARSET = "UTF-8";
     public static final int DEFAULT_RECEIVER_THREADS = 10;
@@ -37,7 +37,9 @@ public final class Constant {
     public static final byte PROTOCOL_VERSION = 0X01;
     public static final int WARM_UP_TIME_SYNC_ATTEMPTS = 5;
 
-    private Constant() {
+    public static final String WINDOW_TYPE_ATTRIBUTE = "windowType";
+
+    private Constants() {
 
     }
 }

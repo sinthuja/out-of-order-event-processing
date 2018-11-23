@@ -22,7 +22,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 import org.apache.log4j.Logger;
-import org.siddhi.extension.disorder.handler.Constant;
+import org.siddhi.extension.disorder.handler.Constants;
 import org.siddhi.extension.disorder.handler.multi.source.EventSourceDriftHolder;
 
 import java.io.UnsupportedEncodingException;
@@ -39,7 +39,7 @@ public class TCPServerInboundHandler extends ChannelInboundHandlerAdapter {
                 return;
             }
             byte protocol = in.readByte();
-            if (protocol != Constant.PROTOCOL_VERSION) {
+            if (protocol != Constants.PROTOCOL_VERSION) {
                 ReferenceCountUtil.release(msg);
                 return;
             }
@@ -49,39 +49,41 @@ public class TCPServerInboundHandler extends ChannelInboundHandlerAdapter {
             int sourceIdSize = in.readInt();
             String sourceId = getString(in, sourceIdSize);
             long requestSendTime = in.readLong();
-            if (messageType.equalsIgnoreCase(Constant.TIME_SYNC_INIT)) {
+            if (messageType.equalsIgnoreCase(Constants.TIME_SYNC_INIT)) {
                 encoded = ctx.alloc().buffer(30);
-                encoded.writeByte(Constant.PROTOCOL_VERSION);
-                encoded.writeByte(Constant.SUCCESS_RESPONSE);
+                encoded.writeByte(Constants.PROTOCOL_VERSION);
+                encoded.writeByte(Constants.SUCCESS_RESPONSE);
                 encoded.writeInt(sourceIdSize);
                 encoded.writeBytes(sourceId.getBytes(StandardCharsets.UTF_8));
                 encoded.writeLong(requestSendTime);
                 encoded.writeLong(receiveTime);
                 encoded.writeLong(System.currentTimeMillis());
-            } else if (messageType.equalsIgnoreCase(Constant.TIME_SYNC_DONE)) {
+            } else if (messageType.equalsIgnoreCase(Constants.TIME_SYNC_DONE)) {
                 long requestReceiveTime = in.readLong();
                 long replySendTime = in.readLong();
                 long replyReceiveTime = in.readLong();
                 long delay = Math.round(((replyReceiveTime - requestSendTime)
-                        - (replySendTime - replyReceiveTime)) * 0.5);
+                        - (replySendTime - requestReceiveTime)) * 0.5);
+                // requestSentTime + drift + delay = requestReceiveTime
                 long drift = requestReceiveTime - replySendTime - delay;
                 System.out.println("################### Current Drift => source : "
                         + sourceId + " , drift: " + drift);
-                EventSourceDriftHolder.getInstance().updateTimeDrift(sourceId, drift);
+                EventSourceDriftHolder.getInstance().updateTimeDrift(sourceId,
+                        new EventSourceDriftHolder.EventSourceDriftInfo(drift, delay));
                 encoded = ctx.alloc().buffer(2);
-                encoded.writeByte(Constant.PROTOCOL_VERSION);
-                encoded.writeInt(Constant.SUCCESS_RESPONSE);
+                encoded.writeByte(Constants.PROTOCOL_VERSION);
+                encoded.writeInt(Constants.SUCCESS_RESPONSE);
             } else {
                 log.error("Unknown message type : " + messageType + " received, hence dropping the message");
                 encoded = ctx.alloc().buffer(2);
-                encoded.writeByte(Constant.PROTOCOL_VERSION);
-                encoded.writeByte(Constant.FAILURE_RESPONSE);
+                encoded.writeByte(Constants.PROTOCOL_VERSION);
+                encoded.writeByte(Constants.FAILURE_RESPONSE);
             }
         } catch (UnsupportedEncodingException e) {
             log.error(e.getMessage(), e);
             encoded = ctx.alloc().buffer(2);
-            encoded.writeByte(Constant.PROTOCOL_VERSION);
-            encoded.writeByte(Constant.FAILURE_RESPONSE);
+            encoded.writeByte(Constants.PROTOCOL_VERSION);
+            encoded.writeByte(Constants.FAILURE_RESPONSE);
         } finally {
             ReferenceCountUtil.release(msg);
             if (encoded != null) {
@@ -93,7 +95,7 @@ public class TCPServerInboundHandler extends ChannelInboundHandlerAdapter {
     private static String getString(ByteBuf byteBuffer, int size) throws UnsupportedEncodingException {
         byte[] bytes = new byte[size];
         byteBuffer.readBytes(bytes);
-        return new String(bytes, Constant.DEFAULT_CHARSET);
+        return new String(bytes, Constants.DEFAULT_CHARSET);
     }
 
 }

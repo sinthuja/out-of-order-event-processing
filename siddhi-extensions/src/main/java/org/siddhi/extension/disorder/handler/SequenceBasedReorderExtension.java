@@ -43,8 +43,8 @@ import org.wso2.siddhi.query.api.definition.Attribute;
 import java.util.*;
 
 @Extension(
-        name = "reorder",
-        namespace = "sequenceBased",
+        name = "sequence",
+        namespace = "reorder",
         description = "This alogortithm orders the events based on the sequence number provided in " +
                 "the particular field of event",
         examples = @Example(description = "TBD"
