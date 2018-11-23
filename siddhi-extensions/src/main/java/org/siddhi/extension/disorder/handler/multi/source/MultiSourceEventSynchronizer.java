@@ -23,10 +23,8 @@ import org.siddhi.extension.disorder.handler.*;
 import org.wso2.siddhi.core.query.processor.Processor;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
@@ -36,7 +34,6 @@ public class MultiSourceEventSynchronizer {
     private Processor nextProcessor;
     private Map<String, EventSource> eventStreamTimeout = new HashMap<>();
     private long userDefinedTimeout;
-    private Set<String> eventSources = new HashSet<>();
 
     MultiSourceEventSynchronizer(Processor nextProcessor, long userDefinedTimeout) {
         this.nextProcessor = nextProcessor;
@@ -47,7 +44,6 @@ public class MultiSourceEventSynchronizer {
     public void putEvent(String sourceId, StreamEvent streamEvent, long eventTime) {
         ConcurrentLinkedQueue<MultiSourceEventWrapper> streamPipe = getStreamPipe(sourceId);
         long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
-        this.eventSources.add(sourceId);
         streamPipe.add(new MultiSourceEventWrapper(sourceId, streamEvent, eventTime + drift));
     }
 
@@ -76,9 +72,9 @@ public class MultiSourceEventSynchronizer {
 
     public long getUncertainTimeRange() {
         long delay = 0;
-        for (String sourceId : this.eventSources) {
+        for (String sourceId : this.sourceBasedStreams.keySet()) {
             long eventSourceDelay = EventSourceDriftHolder.getInstance().getTransportDelay(sourceId);
-            if (eventSourceDelay > delay){
+            if (eventSourceDelay > delay) {
                 delay = eventSourceDelay;
             }
         }
@@ -93,12 +89,21 @@ public class MultiSourceEventSynchronizer {
             // TODO: get from the original event chunk
             while (true) {
                 if (events.isEmpty()) {
+                    //Iterate through all the sources, and fetch the first event in the queue (ie., the smallest
+                    // timestamp events of the source)
                     for (Map.Entry<String, ConcurrentLinkedQueue<MultiSourceEventWrapper>> queue
                             : sourceBasedStreams.entrySet()) {
                         populateEvent(queue.getKey(), queue.getValue());
                     }
+                    //Added all the smallest events from the sources, and as it's the sortedSet, the first element of
+                    // the treeset - events, will have the smallest event among all sources.
+                    //Now get that event and add to the complexEventChunk.
                     checkAndPublishToNextProcess();
                 } else {
+                    //Already the first element of events - treeset is added to the complexEventChunk.
+                    //Now we have to find the subsequent events.
+                    //Fetch the event from the same source as the flushed, and now compare all the event's timestamp,
+                    // and pick the smallest event.
                     MultiSourceEventWrapper flushedEvent = events.first();
                     ConcurrentLinkedQueue<MultiSourceEventWrapper> queue =
                             sourceBasedStreams.get(flushedEvent.getSourceId());
@@ -111,8 +116,11 @@ public class MultiSourceEventSynchronizer {
 
         private void checkAndPublishToNextProcess() {
             if (!events.isEmpty()) {
+                //Based on the comparator implemented the first event is the smallest timestamp
+                // event among all sources.
                 complexEventChunk.add(events.first().getEvent());
             } else {
+                // if all events are processed, then it's time to flush all events.
                 if (complexEventChunk.hasNext()) {
                     nextProcessor.process(complexEventChunk);
                     complexEventChunk = new ComplexEventChunk<>(null, null, true);
@@ -125,7 +133,6 @@ public class MultiSourceEventSynchronizer {
             if (eventWrapper != null) {
                 events.add(eventWrapper);
             } else {
-                //TODO: should wait until the timeout, and hence flush all on hand events
                 nextProcessor.process(complexEventChunk);
                 complexEventChunk = new ComplexEventChunk<>(null, null, true);
                 try {
