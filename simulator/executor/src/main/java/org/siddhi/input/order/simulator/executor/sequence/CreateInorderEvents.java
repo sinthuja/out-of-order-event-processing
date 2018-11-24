@@ -1,0 +1,85 @@
+/*
+ *  Copyright (c) 2018, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *  WSO2 Inc. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+package org.siddhi.input.order.simulator.executor.sequence;
+
+import com.google.common.base.Splitter;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.TreeSet;
+
+public class CreateInorderEvents {
+    private static Splitter splitter = Splitter.on(',');
+    private static TreeSet<SensorEvent> singleSource = new TreeSet<>();
+
+    public static void main(String[] args) throws IOException {
+        String datasetName = "dataset5_2";
+        String sourceFile = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/" + datasetName;
+        String destinationFile = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/in-order-events/" + datasetName;
+        System.out.print("Reading Source file..");
+        populateEvents(sourceFile);
+        System.out.print("Writing the results to file");
+        writeToFile(destinationFile);
+    }
+
+    private static void populateEvents(String fileName) {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(fileName), 10 * 1024 * 1024);
+            String line = br.readLine();
+            int count = 0;
+            while (line != null && !line.isEmpty()) {
+                try {
+                    Iterator<String> dataStrIterator = splitter.split(line).iterator();
+                    Integer sid = Integer.parseInt(dataStrIterator.next()); //sensor id
+                    String ts = dataStrIterator.next(); //Timestamp in pico seconds
+                    SensorEvent sensorEvent = new SensorEvent(Long.parseLong(ts), line);
+                    singleSource.add(sensorEvent);
+                    count++;
+                    if (count % 10000 == 0) {
+                        System.out.println("Processed " + count);
+                    }
+                    line = br.readLine();
+                } catch (NumberFormatException ignored) {
+                    line = br.readLine();
+                }
+            }
+            System.out.println("Total amount of sensorBasedEvents read : " + count);
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void writeToFile(String filePath) throws IOException {
+        BufferedWriter writer = new BufferedWriter(new FileWriter(filePath));
+        int count = 0;
+        for (SensorEvent sensorEvent : singleSource) {
+            String eventData = sensorEvent.getEventLine();
+            if (count != singleSource.size() - 1) {
+                eventData = eventData + "\n";
+            }
+            writer.write(eventData);
+        }
+        writer.close();
+    }
+}

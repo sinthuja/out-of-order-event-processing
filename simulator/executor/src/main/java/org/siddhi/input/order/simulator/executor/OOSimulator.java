@@ -24,7 +24,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 /**
  * Created by miyurud on 7/27/15.
  * This application is a simulator for out of order events. Given a timely ordered event sequence this application
- * introduces disorder if required. This will be useful for debugging ans testing the out-of-order execution of
+ * introduces disorder if required. This will be useful for debugging and testing the out-of-order execution of
  * CEP systems.
  */
 public class OOSimulator {
