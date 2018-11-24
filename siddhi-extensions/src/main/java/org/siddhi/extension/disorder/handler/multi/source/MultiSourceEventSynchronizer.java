@@ -35,16 +35,12 @@ public class MultiSourceEventSynchronizer {
     private Processor nextProcessor;
     private Map<String, EventSource> eventStreamTimeout = new HashMap<>();
     private long userDefinedTimeout;
-    private long missingEventStartTime;
-    private long missingEventEndTime;
     private final Object linkedListLock = new Object();
 
     MultiSourceEventSynchronizer(Processor nextProcessor, long userDefinedTimeout) {
         this.nextProcessor = nextProcessor;
         Executors.newSingleThreadExecutor().submit(new MultiSourceEventSynchronizingWorker());
         this.userDefinedTimeout = userDefinedTimeout;
-        this.missingEventEndTime = -1;
-        this.missingEventStartTime = -1;
     }
 
     public void putEvent(String sourceId, StreamEvent streamEvent, long eventTime, long sequenceNumber,
@@ -103,22 +99,6 @@ public class MultiSourceEventSynchronizer {
 
     public long getLastEventTime(String sourceId) {
         return getStreamPipe(sourceId).getLast().getRelativeTime();
-    }
-
-    public void setMissingEventStartTime(long startTime) {
-        this.missingEventStartTime = startTime;
-    }
-
-    public void setMissingEventEndTime(long endTime) {
-        this.missingEventEndTime = endTime;
-    }
-
-    public long getMissingEventStartTime() {
-        return missingEventStartTime;
-    }
-
-    public long getMissingEventEndTime() {
-        return missingEventEndTime;
     }
 
     public class MultiSourceEventSynchronizingWorker extends Thread {

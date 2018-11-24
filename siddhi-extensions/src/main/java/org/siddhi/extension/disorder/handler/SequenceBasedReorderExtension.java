@@ -112,36 +112,17 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                         }
                     } else {
                         long currentTimestamp = System.currentTimeMillis();
-                        long missingEventWindowStartTime = this.synchronizer.getMissingEventStartTime();
-                        long missingEventWindowEndTime = this.synchronizer.getMissingEventEndTime();
-                        long tempStartTime = -1;
-                        long tempEndTime = -1;
                         for (String s : sourceHashMap.keySet()) {
                             EventSource source = sourceHashMap.get(s);
                             List<StreamEventWrapper> eventWrapper = source.releaseTimeoutBufferedEvents(currentTimestamp);
                             if (eventWrapper != null && !eventWrapper.isEmpty()) {
-                                tempStartTime = this.synchronizer.getLastEventTime(source.getName());
-                                tempEndTime = eventWrapper.get(0).getEventTime() +
-                                        EventSourceDriftHolder.getInstance().getDrift(source.getName());
-                                if (missingEventWindowStartTime == -1) {
-                                    missingEventWindowStartTime = tempStartTime;
-                                } else if (missingEventWindowStartTime > tempStartTime) {
-                                    missingEventWindowStartTime = tempStartTime;
-                                }
-                                if (missingEventWindowEndTime == -1) {
-                                    missingEventWindowEndTime = tempEndTime;
-                                } else if (missingEventWindowEndTime < tempEndTime) {
-                                    missingEventWindowEndTime = tempEndTime;
-                                }
                                 this.synchronizer.putEvent(source.getName(), eventWrapper, complexEventPopulater);
                             }
                         }
                         //Events released from timeout, without meeting the next expected sequence number,
                         // therefore enabled MissingEvent property therefore the windows will be stored.
-                        if (!this.dropIfSeqNumAlreadyPassed) {
-                            this.synchronizer.setMissingEventStartTime(missingEventWindowStartTime);
-                            this.synchronizer.setMissingEventEndTime(missingEventWindowEndTime);
-                        }
+//                        if (!this.dropIfSeqNumAlreadyPassed) {
+//                        }
                     }
                 } catch (UnsupportedParameterException e) {
                     log.error("The event is not unsupported value. ", e);

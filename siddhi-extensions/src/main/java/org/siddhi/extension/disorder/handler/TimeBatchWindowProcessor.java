@@ -225,11 +225,11 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
         if (complexEventChunk != null && complexEventChunk.getFirst() != null) {
             complexEventChunk.setBatch(true);
             nextProcessor.process(complexEventChunk);
-            if (eventSynchronizer != null &&
-                    eventSynchronizer.getMissingEventStartTime() <= currentTime &&
-                    eventSynchronizer.getMissingEventEndTime() >= currentTime) {
-                windowStateStore.storeState(currentTime, currentState());
-            }
+//            if (eventSynchronizer != null &&
+//                    eventSynchronizer.getMissingEventStartTime() <= currentTime &&
+//                    eventSynchronizer.getMissingEventEndTime() >= currentTime) {
+//                windowStateStore.storeState(currentTime, currentState());
+//            }
         }
     }
 
