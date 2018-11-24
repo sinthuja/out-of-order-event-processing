@@ -93,7 +93,6 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
     private SiddhiAppContext siddhiAppContext;
     private boolean isStartTimeEnabled = false;
     private long startTime = 0;
-    private String streamId;
     private long uncertainWindowRange = -1;
     private List<TimeBatchWindow> windows = new ArrayList<>();
     private Map<TimeBatchWindow.Type, ComplexEventChunk<StreamEvent>> sendToNextReady = new HashMap<>();
@@ -116,9 +115,9 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
     protected List<Attribute> init(AbstractDefinition abstractDefinition, ExpressionExecutor[] expressionExecutors,
                                    ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
         this.siddhiAppContext = siddhiAppContext;
-        this.streamId = abstractDefinition.getId();
+        String streamId = abstractDefinition.getId();
         this.eventSynchronizer = MultiSourceEventSynchronizerManager.getInstance()
-                .getMultiSourceEventSynchronizer(this.streamId);
+                .getMultiSourceEventSynchronizer(streamId);
         if (attributeExpressionExecutors.length == 1) {
             checkFirstParameter();
         } else if (attributeExpressionExecutors.length == 2) {
@@ -218,7 +217,6 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
                 this.sendToNextProcessor(this.sendToNextReady.get(TimeBatchWindow.Type.LOW), currentTime);
                 this.sendToNextReady.clear();
             }
-
             streamEventChunk.clear();
         }
     }
@@ -228,7 +226,8 @@ public class TimeBatchWindowProcessor extends StreamProcessor implements Schedul
             complexEventChunk.setBatch(true);
             nextProcessor.process(complexEventChunk);
             if (eventSynchronizer != null &&
-                    eventSynchronizer.isMissingEvent()) {
+                    eventSynchronizer.getMissingEventStartTime() <= currentTime &&
+                    eventSynchronizer.getMissingEventEndTime() >= currentTime) {
                 windowStateStore.storeState(currentTime, currentState());
             }
         }

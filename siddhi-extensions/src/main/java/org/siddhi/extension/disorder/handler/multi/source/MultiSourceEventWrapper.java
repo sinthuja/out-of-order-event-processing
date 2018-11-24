@@ -49,6 +49,10 @@ public class MultiSourceEventWrapper implements Comparable<MultiSourceEventWrapp
         return sequenceNumber;
     }
 
+    public long getRelativeTime() {
+        return relativeTime;
+    }
+
     @Override
     public int compareTo(MultiSourceEventWrapper sourceEventWrapper) {
         if (this.relativeTime > sourceEventWrapper.relativeTime) {

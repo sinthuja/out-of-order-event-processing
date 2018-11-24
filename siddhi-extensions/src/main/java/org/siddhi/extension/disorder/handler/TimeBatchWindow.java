@@ -60,7 +60,6 @@ public class TimeBatchWindow {
         this.scheduler = scheduler;
         this.scheduler.notifyAt(this.nextEmitTime);
         this.type = type;
-
     }
 
     public ComplexEventChunk<StreamEvent> process(ComplexEventChunk<StreamEvent> streamEventChunk,

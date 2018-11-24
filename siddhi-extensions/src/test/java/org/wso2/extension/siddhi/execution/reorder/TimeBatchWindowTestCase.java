@@ -109,7 +109,7 @@ public class TimeBatchWindowTestCase {
         siddhiManager.setExtension("reorder:timeBatch", TimeBatchWindowProcessor.class);
         SiddhiAppRuntime siddhiAppRuntime = siddhiManager.createSiddhiAppRuntime(cseEventStream + query);
 
-        siddhiAppRuntime.addCallback("outputStream",new StreamCallback() {
+        siddhiAppRuntime.addCallback("outputStream", new StreamCallback() {
 
             @Override
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
@@ -146,7 +146,7 @@ public class TimeBatchWindowTestCase {
         siddhiManager.setExtension("reorder:timeBatch", TimeBatchWindowProcessor.class);
         SiddhiAppRuntime siddhiAppRuntime = siddhiManager.createSiddhiAppRuntime(cseEventStream + query);
 
-        siddhiAppRuntime.addCallback("outputStream",new StreamCallback() {
+        siddhiAppRuntime.addCallback("outputStream", new StreamCallback() {
 
             @Override
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
@@ -184,7 +184,7 @@ public class TimeBatchWindowTestCase {
         siddhiManager.setExtension("reorder:timeBatch", TimeBatchWindowProcessor.class);
         SiddhiAppRuntime siddhiAppRuntime = siddhiManager.createSiddhiAppRuntime(cseEventStream + query);
 
-        siddhiAppRuntime.addCallback("outputStream",new StreamCallback() {
+        siddhiAppRuntime.addCallback("outputStream", new StreamCallback() {
 
             @Override
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
@@ -202,6 +202,39 @@ public class TimeBatchWindowTestCase {
         siddhiAppRuntime.shutdown();
     }
 
+    @Test
+    public void timeWindowBatchTest5() throws InterruptedException {
+
+        SiddhiManager siddhiManager = new SiddhiManager();
+
+        String cseEventStream = "" +
+                "define stream cseEventStream (symbol string, price float, volume int);";
+        String query = "" +
+                "@info(name = 'query1') " +
+                "from cseEventStream#reorder:timeBatch(1 sec, 0, 10 milliseconds, false, true) " +
+                "select * " +
+                "insert all events into outputStream;";
+
+        siddhiManager.setExtension("reorder:timeBatch", TimeBatchWindowProcessor.class);
+        SiddhiAppRuntime siddhiAppRuntime = siddhiManager.createSiddhiAppRuntime(cseEventStream + query);
+
+        siddhiAppRuntime.addCallback("outputStream", new StreamCallback() {
+
+            @Override
+            public void receive(org.wso2.siddhi.core.event.Event[] events) {
+                EventPrinter.print(events);
+                eventArrived = true;
+            }
+        });
+
+        InputHandler inputHandler = siddhiAppRuntime.getInputHandler("cseEventStream");
+        siddhiAppRuntime.start();
+        inputHandler.send(new Object[]{"IBM", 700f, 0});
+        inputHandler.send(new Object[]{"WSO2", 60.5f, 1});
+        Thread.sleep(10000);
+        Assert.assertTrue(eventArrived);
+        siddhiAppRuntime.shutdown();
+    }
 
 
 }
