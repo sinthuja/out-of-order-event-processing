@@ -68,6 +68,7 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     private Scheduler scheduler;
     private MultiSourceEventSynchronizer synchronizer;
     private boolean dropIfSeqNumAlreadyPassed = true;
+    private String streamId;
 
     private HashMap<String, EventSource> sourceHashMap = new HashMap<>();
 
@@ -75,6 +76,10 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     protected void process(ComplexEventChunk<StreamEvent> complexEventChunk, Processor processor,
                            StreamEventCloner streamEventCloner, ComplexEventPopulater complexEventPopulater) {
         synchronized (this) {
+            if (this.synchronizer == null) {
+                this.synchronizer = MultiSourceEventSynchronizerManager.getInstance().
+                        getMultiSourceEventSynchronizer(this.streamId, processor, userDefinedTimeout);
+            }
             StreamEvent event;
             String sourceId;
             Long sequenceNumber;
@@ -169,8 +174,7 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
             checkFourthParameter(expressionExecutors);
             checkFifthParameter(expressionExecutors);
         }
-        this.synchronizer = MultiSourceEventSynchronizerManager.getInstance().
-                getMultiSourceEventSynchronizer(abstractDefinition.getId(), getNextProcessor(), userDefinedTimeout);
+        this.streamId = abstractDefinition.getId();
         List<Attribute> eventAttribute = new ArrayList<>();
         eventAttribute.add(new Attribute(Constants.RELATIVE_TIMETSAMP_ATTRIBUTE, Attribute.Type.LONG));
         return eventAttribute;

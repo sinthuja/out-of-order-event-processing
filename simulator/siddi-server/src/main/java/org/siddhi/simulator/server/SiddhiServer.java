@@ -36,7 +36,9 @@ public class SiddhiServer {
 
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
 
-        String query = ("@info(name = 'query1') from inputStream#reorder:sequence(sourceId, seqNum, eventTime) select seqNum, volume, eventTime " +
+        String query = ("@info(name = 'query1') " +
+                "from inputStream#reorder:sequence(sourceId, seqNum, eventTime) " +
+                "select seqNum, volume, eventTime " +
                 "insert into outputStream;");
 
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);

@@ -49,20 +49,27 @@ public class MultiSourceEventSynchronizer {
         long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
         MultiSourceEventWrapper eventWrapper = new MultiSourceEventWrapper(sourceId,
                 streamEvent, eventTime + drift, sequenceNumber, complexEventPopulater);
-        if (streamPipe.getLast().getSequenceNumber() < sequenceNumber) {
-            streamPipe.add(eventWrapper);
-        } else {
-            //Add the event in the most corrrect position.
-            synchronized (linkedListLock) {
-                int index = 0;
-                for (MultiSourceEventWrapper element : streamPipe) {
-                    if (element.getSequenceNumber() > sequenceNumber) {
-                        streamPipe.add(index, eventWrapper);
-                        break;
+        if (!streamPipe.isEmpty()) {
+            if (streamPipe.getLast().getSequenceNumber() < sequenceNumber) {
+                synchronized (linkedListLock) {
+                    streamPipe.add(eventWrapper);
+                }
+            } else {
+                //Add the event in the most corrrect position.
+                synchronized (linkedListLock) {
+                    int index = 0;
+                    for (MultiSourceEventWrapper element : streamPipe) {
+                        if (element.getSequenceNumber() > sequenceNumber) {
+                            streamPipe.add(index, eventWrapper);
+                            break;
+                        }
                     }
                 }
             }
-
+        } else {
+            synchronized (linkedListLock) {
+                streamPipe.add(eventWrapper);
+            }
         }
     }
 
@@ -80,9 +87,11 @@ public class MultiSourceEventSynchronizer {
         LinkedList<MultiSourceEventWrapper> streamPipe = getStreamPipe(sourceId);
         for (StreamEventWrapper eventWrapper : eventList) {
             long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
-            streamPipe.add(new MultiSourceEventWrapper(sourceId, eventWrapper.getStreamEvent(),
-                    eventWrapper.getEventTime() + drift,
-                    eventWrapper.getSequenceNum(), complexEventPopulater));
+            synchronized (linkedListLock) {
+                streamPipe.add(new MultiSourceEventWrapper(sourceId, eventWrapper.getStreamEvent(),
+                        eventWrapper.getEventTime() + drift,
+                        eventWrapper.getSequenceNum(), complexEventPopulater));
+            }
         }
     }
 
@@ -155,18 +164,28 @@ public class MultiSourceEventSynchronizer {
         private void populateEvent(String sourceId, LinkedList<MultiSourceEventWrapper> queue) {
             if (!queue.isEmpty()) {
                 synchronized (linkedListLock) {
-                    events.add(queue.removeFirst());
+                    try {
+                        if (!queue.isEmpty()) {
+                            events.add(queue.removeFirst());
+                        }
+                    } catch (Throwable throwable) {
+                        throwable.printStackTrace();
+                    }
                 }
             } else {
-                nextProcessor.process(complexEventChunk);
-                complexEventChunk = new ComplexEventChunk<>(null, null, true);
+                if (complexEventChunk.hasNext()) {
+                    nextProcessor.process(complexEventChunk);
+                    complexEventChunk = new ComplexEventChunk<>(null, null, true);
+                }
                 try {
                     Thread.sleep(Utils.getTimeout(userDefinedTimeout, eventStreamTimeout.get(sourceId)));
                 } catch (InterruptedException ignored) {
                 }
                 if (!queue.isEmpty()) {
                     synchronized (linkedListLock) {
-                        events.add(queue.removeFirst());
+                        if (!queue.isEmpty()) {
+                            events.add(queue.removeFirst());
+                        }
                     }
                 }
             }
