@@ -38,8 +38,8 @@ public class SiddhiServer {
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
 
         String query = ("@info(name = 'query1') " +
-                "from inputStream#reorder:sequence(sourceId, seqNum) " +
-                "select sourceId, seqNum, eventTimestamp() as relativeTimestamp " +
+                "from inputStream#reorder:sequence(sourceId, seqNum, 20L, 20L, false) " +
+                "select sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts " +
                 "insert into outputStream;");
 
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
@@ -48,16 +48,24 @@ public class SiddhiServer {
         executionPlanRuntime.addCallback("outputStream", new StreamCallback() {
             private int count = 0;
             private long latency = 0;
+            private long lastEventTime = -1;
+            private int ooOrdereventsCount = 0;
 
             @Override
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
                 for (org.wso2.siddhi.core.event.Event event : events) {
                     latency = latency + (System.currentTimeMillis() - (Long) event.getData()[2]);
                     count++;
+                    long currentEventTime = (Long) event.getData()[3];
+                    if (lastEventTime > currentEventTime) {
+                        ooOrdereventsCount++;
+                    }
+                    lastEventTime = currentEventTime;
                 }
                 System.out.println("------------------------------------");
                 System.out.println("Total Events => " + count);
                 System.out.println("Average Latency => " + latency / count);
+                System.out.println("Out of order total events => " + ooOrdereventsCount);
                 System.out.println("------------------------------------");
             }
         });

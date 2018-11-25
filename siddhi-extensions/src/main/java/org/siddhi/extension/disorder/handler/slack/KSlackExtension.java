@@ -76,7 +76,8 @@ public class KSlackExtension extends StreamProcessor implements SchedulingProces
         return new HashMap<String, Object>();
     }
 
-    @Override public void restoreState(Map<String, Object> map) {
+    @Override
+    public void restoreState(Map<String, Object> map) {
 
     }
 
@@ -85,7 +86,7 @@ public class KSlackExtension extends StreamProcessor implements SchedulingProces
                            StreamEventCloner streamEventCloner, ComplexEventPopulater complexEventPopulater) {
         ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<StreamEvent>(false);
         try {
-        lock.lock();
+            lock.lock();
             while (streamEventChunk.hasNext()) {
                 StreamEvent event = streamEventChunk.next();
 
@@ -171,7 +172,9 @@ public class KSlackExtension extends StreamProcessor implements SchedulingProces
         } finally {
             lock.unlock();
         }
-        nextProcessor.process(complexEventChunk);
+        if (nextProcessor != null) {
+            nextProcessor.process(complexEventChunk);
+        }
     }
 
     @Override
