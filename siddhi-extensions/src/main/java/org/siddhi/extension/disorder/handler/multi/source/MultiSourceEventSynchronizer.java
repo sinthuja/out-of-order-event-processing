@@ -28,10 +28,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 
 public class MultiSourceEventSynchronizer {
-    private Map<String, LinkedList<MultiSourceEventWrapper>> sourceBasedStreams = new HashMap<>();
+    private Map<String, LinkedList<MultiSourceEventWrapper>> sourceBasedStreams = new ConcurrentHashMap<>();
     private Processor nextProcessor;
     private Map<String, EventSource> eventStreamTimeout = new HashMap<>();
     private long userDefinedTimeout;
