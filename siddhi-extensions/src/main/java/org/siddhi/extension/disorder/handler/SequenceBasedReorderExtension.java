@@ -20,7 +20,6 @@ package org.siddhi.extension.disorder.handler;
 import org.apache.log4j.Logger;
 import org.siddhi.extension.disorder.handler.exception.SequenceNumberAlreadyPassedException;
 import org.siddhi.extension.disorder.handler.exception.UnsupportedParameterException;
-import org.siddhi.extension.disorder.handler.multi.source.EventSourceDriftHolder;
 import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizer;
 import org.siddhi.extension.disorder.handler.multi.source.MultiSourceEventSynchronizerManager;
 import org.siddhi.extension.disorder.handler.synchronization.TCPNettySyncServer;
@@ -104,7 +103,8 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                                 this.synchronizer.putEvent(sourceId, event, getEventTime(event),
                                         sequenceNumber, complexEventPopulater);
                                 if (response[1]) {
-                                    this.synchronizer.putEvent(sourceId, source.checkAndReleaseBufferedEvents(), complexEventPopulater);
+                                    this.synchronizer.putEvent(sourceId, source.checkAndReleaseBufferedEvents(),
+                                            complexEventPopulater);
                                 }
                             } else {
                                 scheduler.notifyAt(expiryTimestamp);

@@ -1,20 +1,20 @@
 /*
-*  Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
-*  WSO2 Inc. licenses this file to you under the Apache License,
-*  Version 2.0 (the "License"); you may not use this file except
-*  in compliance with the License.
-*  You may obtain a copy of the License at
-*
-*    http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing,
-* software distributed under the License is distributed on an
-* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-* KIND, either express or implied.  See the License for the
-* specific language governing permissions and limitations
-* under the License.
-*
-*/
+ *  Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *  WSO2 Inc. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
 package org.siddhi.extension.disorder.handler;
 
 import org.apache.log4j.Logger;
@@ -39,7 +39,8 @@ public class EventSource {
     private TreeMap<Long, List<Long>> timeoutBuffer;
     private ExpressionExecutor timestampExecutor;
 
-    //This provides the delay that it have been or could have been in the buffer, so we can calculate the time that it can be held in the buffer for furture adjustment.
+    //This provides the delay that it have been or could have been in the buffer, so we can calculate the time that it
+    // can be held in the buffer for future adjustment.
     private long bufferedEventsDelay;
 
     private static final double DELAY_SMOOTHING_FACTOR = 0.5;
@@ -52,19 +53,6 @@ public class EventSource {
         this.name = name;
         this.lastSequenceNumber = new AtomicLong(0);
         this.timestampExecutor = timestampExecutor;
-        this.averageInoderEventArrivalInterval = -1;
-        this.bufferedEventsDelay = -1;
-        this.buffer = new TreeMap<>();
-        this.timeoutBuffer = new TreeMap<>();
-        this.timeoutReleasedEvents = new TreeMap<>();
-    }
-
-    EventSource(String name) throws UnsupportedParameterException {
-        if (name == null || name.isEmpty()) {
-            throw new UnsupportedParameterException("Name of the event source is empty!");
-        }
-        this.name = name;
-        this.lastSequenceNumber = new AtomicLong(0);
         this.averageInoderEventArrivalInterval = -1;
         this.bufferedEventsDelay = -1;
         this.buffer = new TreeMap<>();
@@ -87,13 +75,15 @@ public class EventSource {
                 seqNumList = new ArrayList<>();
                 seqNumList.add(sequenceNumber);
                 timeoutBuffer.put(expiryTimestamp, seqNumList);
+            } else {
+                seqNumList.add(sequenceNumber);
             }
         } else {
             String msg = "Expected Sequence number " + expectedNextSeqNumber + " is greater than received sequence number "
                     + sequenceNumber;
             log.error("Expected Sequence number " + expectedNextSeqNumber + " is greater than received sequence number "
                     + sequenceNumber);
-            long currentTime =  System.currentTimeMillis();
+            long currentTime = System.currentTimeMillis();
             if (this.timeoutReleasedEvents.size() > 0) {
                 Iterator<Long> timeoutSequenceNumIterator = this.timeoutReleasedEvents.keySet().iterator();
                 while (timeoutSequenceNumIterator.hasNext()) {
@@ -139,7 +129,7 @@ public class EventSource {
         return null;
     }
 
-    private void setEventTime(StreamEventWrapper streamEventWrapper){
+    private void setEventTime(StreamEventWrapper streamEventWrapper) {
         long currentEventTimestamp = streamEventWrapper.getStreamEvent().getTimestamp();
         if (timestampExecutor != null) {
             currentEventTimestamp = (Long) timestampExecutor.execute(streamEventWrapper.getStreamEvent());
@@ -283,7 +273,7 @@ public class EventSource {
         return bufferedEventsDelay;
     }
 
-    String getName(){
+    String getName() {
         return this.name;
     }
 }

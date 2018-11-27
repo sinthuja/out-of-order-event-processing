@@ -72,6 +72,7 @@ public class SingleSource {
             try {
                 int bundleIndex = 0;
                 Event[] eventBundle = new Event[bundleSize];
+                int count = 0;
                 while (true) {
                     Event event = events.poll();
                     if (event == null) {
@@ -79,6 +80,7 @@ public class SingleSource {
                             eventBundle = Arrays.copyOf(eventBundle, bundleIndex);
                             tcpNettyClient.send("TestServer/inputStream", BinaryEventConverter.convertToBinaryMessage(
                                     eventBundle, types).array()).await();
+                            count = count + eventBundle.length;
                             bundleIndex = 0;
                             eventBundle = new Event[bundleSize];
                         }
@@ -93,11 +95,12 @@ public class SingleSource {
                     if (bundleIndex == bundleSize) {
                         tcpNettyClient.send("TestServer/inputStream", BinaryEventConverter.convertToBinaryMessage(
                                 eventBundle, types).array()).await();
+                        count = count + eventBundle.length;
                         bundleIndex = 0;
                         eventBundle = new Event[bundleSize];
                     }
                 }
-                log.info("Completed Publishing  events .. ");
+                log.info("Completed Publishing  events => " + count);
             } catch (IOException | InterruptedException e) {
                 log.error(e);
             }

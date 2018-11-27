@@ -64,6 +64,7 @@ public class MultiSourceEventSynchronizer {
                             streamPipe.add(index, eventWrapper);
                             break;
                         }
+                        index++;
                     }
                 }
             }

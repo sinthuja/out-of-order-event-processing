@@ -60,8 +60,9 @@ public class SiddhiServerAKSlack {
                     long currentEventTime = (Long) event.getData()[3];
                     if (lastEventTime > currentEventTime) {
                         ooOrdereventsCount++;
+                    } else {
+                        lastEventTime = currentEventTime;
                     }
-                    lastEventTime = currentEventTime;
                 }
                 System.out.println("------------------------------------");
                 System.out.println("Total Events => " + count);
