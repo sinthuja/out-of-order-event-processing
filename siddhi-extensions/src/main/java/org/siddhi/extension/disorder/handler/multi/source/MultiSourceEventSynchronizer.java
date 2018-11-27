@@ -112,7 +112,7 @@ public class MultiSourceEventSynchronizer {
 
     public class MultiSourceEventSynchronizingWorker extends Thread {
         private TreeSet<MultiSourceEventWrapper> events = new TreeSet<>();
-        private TreeSet<MultiSourceEventWrapper> eventChunk = new TreeSet<>();
+        private ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<>(false);
 
         public void run() {
             // TODO: get from the original event chunk
@@ -169,23 +169,12 @@ public class MultiSourceEventSynchronizer {
             if (!events.isEmpty()) {
                 //Based on the comparator implemented the first event is the smallest timestamp
                 // event among all sources.
-//                complexEventChunk.add(events.first().getEvent());
-                MultiSourceEventWrapper event = events.first();
-                eventChunk.add(event);
+                complexEventChunk.add(events.first().getEvent());
             } else {
                 // if all events are processed, then it's time to flush all events.
-//                if (complexEventChunk.hasNext()) {
-//                    System.out.println("No of sources: " + sourceBasedStreams.size());
-//                    nextProcessor.process(complexEventChunk);
-//                    complexEventChunk = new ComplexEventChunk<>(null, null, true);
-//                }
-                if (!eventChunk.isEmpty()) {
-                    ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<>(false);
-                    for (MultiSourceEventWrapper eventWrapper : eventChunk) {
-                        complexEventChunk.add(eventWrapper.getEvent());
-                    }
+                if (complexEventChunk.hasNext()) {
                     nextProcessor.process(complexEventChunk);
-                    eventChunk.clear();
+                    complexEventChunk.clear();
                 }
             }
         }
@@ -204,18 +193,10 @@ public class MultiSourceEventSynchronizer {
                     }
                 }
             } else {
-                if (!eventChunk.isEmpty()) {
-                    ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<>(false);
-                    for (MultiSourceEventWrapper eventWrapper : eventChunk) {
-                        complexEventChunk.add(eventWrapper.getEvent());
-                    }
+                if (complexEventChunk.hasNext()) {
                     nextProcessor.process(complexEventChunk);
-                    eventChunk.clear();
+                    complexEventChunk = new ComplexEventChunk<>(null, null, true);
                 }
-//                if (complexEventChunk.hasNext()) {
-//                    nextProcessor.process(complexEventChunk);
-//                    complexEventChunk = new ComplexEventChunk<>(null, null, true);
-//                }
                 if (!wrapperQueue.alreadyCheckedWithoutEvent) {
                     try {
                         Thread.sleep(Utils.getTimeout(userDefinedTimeout, eventStreamTimeout.get(sourceId)));
