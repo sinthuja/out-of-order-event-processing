@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 
 public class MultiSourceEventSynchronizer {
-    private Map<String, LinkedList<MultiSourceEventWrapper>> sourceBasedStreams = new ConcurrentHashMap<>();
+    private Map<String, MultiSourceEventWrapperQueue> sourceBasedStreams = new ConcurrentHashMap<>();
     private Processor nextProcessor;
     private Map<String, EventSource> eventStreamTimeout = new HashMap<>();
     private long userDefinedTimeout;
@@ -76,19 +76,20 @@ public class MultiSourceEventSynchronizer {
     }
 
     private LinkedList<MultiSourceEventWrapper> getStreamPipe(String sourceId) {
-        LinkedList<MultiSourceEventWrapper> streamPipe = sourceBasedStreams.get(sourceId);
+        MultiSourceEventWrapperQueue streamPipe = sourceBasedStreams.get(sourceId);
         if (streamPipe == null) {
             synchronized (sourceId.intern()) {
-                streamPipe = sourceBasedStreams.computeIfAbsent(sourceId, k -> new LinkedList<>());
+                streamPipe = sourceBasedStreams.computeIfAbsent(sourceId, k ->
+                        new MultiSourceEventWrapperQueue(new LinkedList<>()));
             }
         }
-        return streamPipe;
+        return streamPipe.queue;
     }
 
     public void putEvent(String sourceId, List<StreamEventWrapper> eventList, ComplexEventPopulater complexEventPopulater) {
         LinkedList<MultiSourceEventWrapper> streamPipe = getStreamPipe(sourceId);
+        long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
         for (StreamEventWrapper eventWrapper : eventList) {
-            long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
             synchronized (linkedListLock) {
                 streamPipe.add(new MultiSourceEventWrapper(sourceId, eventWrapper.getStreamEvent(),
                         eventWrapper.getEventTime() + drift,
@@ -108,27 +109,27 @@ public class MultiSourceEventSynchronizer {
         return delay;
     }
 
-    public long getLastEventTime(String sourceId) {
-        return getStreamPipe(sourceId).getLast().getRelativeTime();
-    }
 
     public class MultiSourceEventSynchronizingWorker extends Thread {
         private TreeSet<MultiSourceEventWrapper> events = new TreeSet<>();
-        private ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<>(null, null, true);
+        private TreeSet<MultiSourceEventWrapper> eventChunk = new TreeSet<>();
 
         public void run() {
             // TODO: get from the original event chunk
             while (true) {
                 try {
+                    while (sourceBasedStreams.size() < 2) {
+                        Thread.sleep(5);
+                    }
                     if (events.isEmpty()) {
                         //Iterate through all the sources, and fetch the first event in the queue (ie., the smallest
                         // timestamp events of the source)
-                        for (Map.Entry<String, LinkedList<MultiSourceEventWrapper>> queue
+                        for (Map.Entry<String, MultiSourceEventWrapperQueue> queue
                                 : sourceBasedStreams.entrySet()) {
                             populateEvent(queue.getKey(), queue.getValue());
                         }
                         //Added all the smallest events from the sources, and as it's the sortedSet, the first element of
-                        // the treeset - events, will have the smallest event among all sources.
+                        // the tree set - events, will have the smallest event among all sources.
                         //Now get that event and add to the complexEventChunk.
                         checkAndPublishToNextProcess();
                     } else {
@@ -136,11 +137,26 @@ public class MultiSourceEventSynchronizer {
                         //Now we have to find the subsequent events.
                         //Fetch the event from the same source as the flushed, and now compare all the event's timestamp,
                         // and pick the smallest event.
-                        MultiSourceEventWrapper flushedEvent = events.first();
-                        LinkedList<MultiSourceEventWrapper> queue =
+                        MultiSourceEventWrapper flushedEvent = events.pollFirst();
+                        MultiSourceEventWrapperQueue queue =
                                 sourceBasedStreams.get(flushedEvent.getSourceId());
-                        events.remove(flushedEvent);
-                        populateEvent(flushedEvent.getSourceId(), queue);
+                        if (events.size() != sourceBasedStreams.size() - 1) {
+                            for (Map.Entry<String, MultiSourceEventWrapperQueue> eventQueue
+                                    : sourceBasedStreams.entrySet()) {
+                                boolean alreadyAdded = false;
+                                for (MultiSourceEventWrapper eventWrapper : events) {
+                                    if (eventWrapper.getSourceId().equalsIgnoreCase(eventQueue.getKey())) {
+                                        alreadyAdded = true;
+                                        break;
+                                    }
+                                }
+                                if (!alreadyAdded) {
+                                    populateEvent(eventQueue.getKey(), eventQueue.getValue());
+                                }
+                            }
+                        } else {
+                            populateEvent(flushedEvent.getSourceId(), queue);
+                        }
                         checkAndPublishToNextProcess();
                     }
                 } catch (Throwable throwable) {
@@ -153,44 +169,79 @@ public class MultiSourceEventSynchronizer {
             if (!events.isEmpty()) {
                 //Based on the comparator implemented the first event is the smallest timestamp
                 // event among all sources.
-                complexEventChunk.add(events.first().getEvent());
+//                complexEventChunk.add(events.first().getEvent());
+                MultiSourceEventWrapper event = events.first();
+                eventChunk.add(event);
             } else {
                 // if all events are processed, then it's time to flush all events.
-                if (complexEventChunk.hasNext()) {
+//                if (complexEventChunk.hasNext()) {
+//                    System.out.println("No of sources: " + sourceBasedStreams.size());
+//                    nextProcessor.process(complexEventChunk);
+//                    complexEventChunk = new ComplexEventChunk<>(null, null, true);
+//                }
+                if (!eventChunk.isEmpty()) {
+                    ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<>(false);
+                    for (MultiSourceEventWrapper eventWrapper : eventChunk) {
+                        complexEventChunk.add(eventWrapper.getEvent());
+                    }
                     nextProcessor.process(complexEventChunk);
-                    complexEventChunk = new ComplexEventChunk<>(null, null, true);
+                    eventChunk.clear();
                 }
             }
         }
 
-        private void populateEvent(String sourceId, LinkedList<MultiSourceEventWrapper> queue) {
+        private void populateEvent(String sourceId, MultiSourceEventWrapperQueue wrapperQueue) {
+            LinkedList<MultiSourceEventWrapper> queue = wrapperQueue.queue;
             if (!queue.isEmpty()) {
                 synchronized (linkedListLock) {
                     try {
                         if (!queue.isEmpty()) {
                             events.add(queue.removeFirst());
+                            wrapperQueue.alreadyCheckedWithoutEvent = false;
                         }
                     } catch (Throwable throwable) {
                         throwable.printStackTrace();
                     }
                 }
             } else {
-                if (complexEventChunk.hasNext()) {
+                if (!eventChunk.isEmpty()) {
+                    ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<>(false);
+                    for (MultiSourceEventWrapper eventWrapper : eventChunk) {
+                        complexEventChunk.add(eventWrapper.getEvent());
+                    }
                     nextProcessor.process(complexEventChunk);
-                    complexEventChunk = new ComplexEventChunk<>(null, null, true);
+                    eventChunk.clear();
                 }
-                try {
-                    Thread.sleep(Utils.getTimeout(userDefinedTimeout, eventStreamTimeout.get(sourceId)));
-                } catch (InterruptedException ignored) {
-                }
-                if (!queue.isEmpty()) {
-                    synchronized (linkedListLock) {
-                        if (!queue.isEmpty()) {
-                            events.add(queue.removeFirst());
+//                if (complexEventChunk.hasNext()) {
+//                    nextProcessor.process(complexEventChunk);
+//                    complexEventChunk = new ComplexEventChunk<>(null, null, true);
+//                }
+                if (!wrapperQueue.alreadyCheckedWithoutEvent) {
+                    try {
+                        Thread.sleep(Utils.getTimeout(userDefinedTimeout, eventStreamTimeout.get(sourceId)));
+                    } catch (InterruptedException ignored) {
+                    }
+                    if (!queue.isEmpty()) {
+                        synchronized (linkedListLock) {
+                            if (!queue.isEmpty()) {
+                                events.add(queue.removeFirst());
+                            }
                         }
+                    } else {
+                        wrapperQueue.alreadyCheckedWithoutEvent = true;
                     }
                 }
             }
+        }
+    }
+
+    public class MultiSourceEventWrapperQueue {
+        private LinkedList<MultiSourceEventWrapper> queue;
+        private boolean alreadyCheckedWithoutEvent;
+
+        MultiSourceEventWrapperQueue(LinkedList<MultiSourceEventWrapper> queue) {
+            this.queue = queue;
+            this.alreadyCheckedWithoutEvent = false;
         }
     }
 

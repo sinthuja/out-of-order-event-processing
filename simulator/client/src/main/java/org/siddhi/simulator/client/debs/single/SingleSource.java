@@ -19,7 +19,6 @@ package org.siddhi.simulator.client.debs.single;
 
 import com.google.common.base.Splitter;
 import org.apache.log4j.Logger;
-import org.siddhi.simulator.client.SingleEventSourcePublisher0;
 import org.wso2.extension.siddhi.io.tcp.transport.TCPNettyClient;
 import org.wso2.extension.siddhi.map.binary.sinkmapper.BinaryEventConverter;
 import org.wso2.extension.siddhi.map.binary.utils.EventDefinitionConverterUtil;
@@ -37,7 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class SingleSource {
-    private static final Logger log = Logger.getLogger(SingleEventSourcePublisher0.class);
+    private static final Logger log = Logger.getLogger(SingleSource.class);
     private static Splitter splitter = Splitter.on(',');
     private static final int bundleSize = 100;
     private static LinkedBlockingQueue<Event> events = new LinkedBlockingQueue<>();
@@ -45,7 +44,7 @@ public class SingleSource {
 
     public static void main(String[] args) {
         TCPNettyClient tcpNettyClient = null;
-        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset2";
+        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset1";
         DataLoader loader = new DataLoader(path);
         Executors.newSingleThreadExecutor().execute(loader);
         try {

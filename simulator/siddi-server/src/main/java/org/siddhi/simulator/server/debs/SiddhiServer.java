@@ -38,7 +38,7 @@ public class SiddhiServer {
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
 
         String query = ("@info(name = 'query1') " +
-                "from inputStream#reorder:sequence(sourceId, seqNum, 20L, 20L, false) " +
+                "from inputStream#reorder:sequence(sourceId, seqNum, ts, 20L, false) " +
                 "select sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts " +
                 "insert into outputStream;");
 
@@ -63,11 +63,13 @@ public class SiddhiServer {
                         lastEventTime = currentEventTime;
                     }
                 }
-                System.out.println("------------------------------------");
-                System.out.println("Total Events => " + count);
-                System.out.println("Average Latency => " + latency / count);
-                System.out.println("Out of order total events => " + ooOrdereventsCount);
-                System.out.println("------------------------------------");
+//                if (count % 1000 == 1) {
+                    System.out.println("------------------------------------");
+                    System.out.println("Total Events => " + count);
+                    System.out.println("Average Latency => " + latency / count);
+                    System.out.println("Out of order total events => " + ooOrdereventsCount);
+                    System.out.println("------------------------------------");
+//                }
             }
         });
         executionPlanRuntime.start();

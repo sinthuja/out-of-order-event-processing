@@ -55,12 +55,13 @@ public class MultiSourceEventWrapper implements Comparable<MultiSourceEventWrapp
 
     @Override
     public int compareTo(MultiSourceEventWrapper sourceEventWrapper) {
-        if (this.relativeTime > sourceEventWrapper.relativeTime) {
-            return 1;
-        } else if (this.relativeTime < sourceEventWrapper.relativeTime) {
-            return -1;
-        } else {
+        if (sourceEventWrapper.equals(this)) {
             return 0;
+        }
+        if (this.relativeTime >= sourceEventWrapper.relativeTime) {
+            return 1;
+        } else {
+            return -1;
         }
     }
 }
