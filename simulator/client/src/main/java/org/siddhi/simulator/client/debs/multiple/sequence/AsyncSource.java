@@ -15,7 +15,7 @@
  * under the License.
  *
  */
-package org.siddhi.simulator.client.debs.multiple;
+package org.siddhi.simulator.client.debs.multiple.sequence;
 
 import org.apache.log4j.Logger;
 import org.wso2.extension.siddhi.io.tcp.transport.TCPNettyClient;

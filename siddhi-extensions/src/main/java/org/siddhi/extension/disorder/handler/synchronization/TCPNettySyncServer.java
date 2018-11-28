@@ -78,7 +78,7 @@ public class TCPNettySyncServer {
                 .childHandler(new ChannelInitializer() {
 
                     @Override
-                    protected void initChannel(Channel channel) throws Exception {
+                    protected void initChannel(Channel channel) {
                         ChannelPipeline p = channel.pipeline();
                         p.addLast(new TCPServerInboundHandler());
                     }

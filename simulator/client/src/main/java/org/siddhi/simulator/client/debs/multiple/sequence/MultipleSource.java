@@ -15,11 +15,12 @@
  * under the License.
  *
  */
-package org.siddhi.simulator.client.debs.multiple;
+package org.siddhi.simulator.client.debs.multiple.sequence;
 
 import com.google.common.base.Splitter;
 import org.apache.log4j.Logger;
 import org.siddhi.simulator.client.SingleEventSourcePublisher0;
+import org.siddhi.simulator.client.debs.multiple.sequence.AsyncSource;
 import org.wso2.extension.siddhi.map.binary.utils.EventDefinitionConverterUtil;
 import org.wso2.siddhi.core.event.Event;
 import org.wso2.siddhi.query.api.definition.Attribute;
@@ -28,21 +29,25 @@ import org.wso2.siddhi.query.api.definition.StreamDefinition;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class MultipleSource {
-    private static final Logger log = Logger.getLogger(SingleEventSourcePublisher0.class);
+    private static final Logger log = Logger.getLogger(MultipleSource.class);
     private static Splitter splitter = Splitter.on(',');
     private static final int bundleSize = 100;
     private static Map<String, LinkedBlockingQueue<Event>> eventsQueue = new HashMap<>();
+    private static List<AsyncSource> asyncSources = new ArrayList<>();
     public static boolean START = false;
 
     public static void main(String[] args) {
-        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/2-source/dataset2";
+        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/20-source/dataset2";
         loadData(path);
         final StreamDefinition streamDefinition = StreamDefinition.id("inputStream")
                 .attribute("sid", Attribute.Type.INT)
@@ -62,9 +67,13 @@ public class MultipleSource {
                 .attribute("seqNum", Attribute.Type.LONG);
         Attribute.Type[] types = EventDefinitionConverterUtil
                 .generateAttributeTypeArray(streamDefinition.getAttributeList());
+        ExecutorService service = Executors.newFixedThreadPool(eventsQueue.size());
         for (Map.Entry<String, LinkedBlockingQueue<Event>> entry : eventsQueue.entrySet()) {
             AsyncSource source = new AsyncSource(entry.getKey(), types, entry.getValue(), bundleSize);
-            Executors.newFixedThreadPool(eventsQueue.size()).submit(source);
+            asyncSources.add(source);
+        }
+        for (AsyncSource asyncSource: asyncSources){
+            service.submit(asyncSource);
         }
         START = true;
     }

@@ -35,6 +35,10 @@ public class EventSourceDriftHolder {
         return instance;
     }
 
+    public int getNumberOfSources() {
+        return eventSourceDrift.size();
+    }
+
     public void updateTimeDrift(String sourceId, EventSourceDriftInfo timeDrift) {
         String key = getKey(sourceId);
         synchronized (key.intern()) {

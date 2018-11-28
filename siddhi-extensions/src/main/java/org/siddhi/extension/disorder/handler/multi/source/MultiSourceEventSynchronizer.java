@@ -116,11 +116,15 @@ public class MultiSourceEventSynchronizer {
 
         public void run() {
             // TODO: get from the original event chunk
+            while (EventSourceDriftHolder.getInstance().getNumberOfSources() != sourceBasedStreams.size()) {
+                try {
+                    Thread.sleep(5);
+                } catch (InterruptedException e) {
+                }
+            }
             while (true) {
                 try {
-                    while (sourceBasedStreams.size() < 2) {
-                        Thread.sleep(5);
-                    }
+                    //Waiting until all sources have started to send events to synchronize.
                     if (events.isEmpty()) {
                         //Iterate through all the sources, and fetch the first event in the queue (ie., the smallest
                         // timestamp events of the source)

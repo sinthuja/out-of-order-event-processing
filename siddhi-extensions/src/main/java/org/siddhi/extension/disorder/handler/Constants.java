@@ -24,8 +24,8 @@ package org.siddhi.extension.disorder.handler;
 public final class Constants {
 
     public static final String DEFAULT_CHARSET = "UTF-8";
-    public static final int DEFAULT_RECEIVER_THREADS = 10;
-    public static final int DEFAULT_WORKER_THREADS = 10;
+    public static final int DEFAULT_RECEIVER_THREADS = 50;
+    public static final int DEFAULT_WORKER_THREADS = 50;
     public static final int DEFAULT_PORT = 7452;
     public static final String TIME_SYNC_INIT = "T_SYN_IT";
     public static final String TIME_SYNC_DONE = "T_SYN_DE";
