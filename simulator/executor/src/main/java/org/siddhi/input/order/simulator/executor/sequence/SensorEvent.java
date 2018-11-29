@@ -29,9 +29,12 @@ public class SensorEvent implements Comparable<SensorEvent> {
     public void updateEvent(long sequenceNumber, int sensorId) {
         eventLine = eventLine + "," + sensorId + "," + sequenceNumber;
     }
-
     public String getEventLine() {
         return eventLine;
+    }
+
+    public long getTimestamp(){
+        return timestamp;
     }
 
 

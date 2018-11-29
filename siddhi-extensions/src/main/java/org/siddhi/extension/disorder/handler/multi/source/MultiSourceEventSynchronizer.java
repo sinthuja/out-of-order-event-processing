@@ -50,14 +50,12 @@ public class MultiSourceEventSynchronizer {
         long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
         MultiSourceEventWrapper eventWrapper = new MultiSourceEventWrapper(sourceId,
                 streamEvent, eventTime + drift, sequenceNumber, complexEventPopulater);
-        if (!streamPipe.isEmpty()) {
-            if (streamPipe.getLast().getSequenceNumber() < sequenceNumber) {
-                synchronized (linkedListLock) {
+        synchronized (linkedListLock) {
+            if (!streamPipe.isEmpty()) {
+                if (streamPipe.getLast().getSequenceNumber() < sequenceNumber) {
                     streamPipe.add(eventWrapper);
-                }
-            } else {
-                //Add the event in the most corrrect position.
-                synchronized (linkedListLock) {
+                } else {
+                    //Add the event in the most corrrect position.
                     int index = 0;
                     for (MultiSourceEventWrapper element : streamPipe) {
                         if (element.getSequenceNumber() > sequenceNumber) {
@@ -67,10 +65,10 @@ public class MultiSourceEventSynchronizer {
                         index++;
                     }
                 }
-            }
-        } else {
-            synchronized (linkedListLock) {
-                streamPipe.add(eventWrapper);
+            } else {
+                synchronized (linkedListLock) {
+                    streamPipe.add(eventWrapper);
+                }
             }
         }
     }

@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Stream;
 
 
 /**
@@ -89,7 +90,11 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
     private double confidenceLevel = 0.95;
     private double alpha = 1;
     private SiddhiAppContext siddhiAppContext;
-    private boolean isIntCorrelationField = false;
+    private WindowCoverage windowCoverage;
+    private double criticalValue;
+
+    public AlphaKSlackExtension() {
+    }
 
     @Override
     public void start() {
@@ -126,11 +131,11 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
         largestTimestamp = (Long) map.get("largestTimestamp");
         lastSentTimestamp = (Long) map.get("lastSentTimestamp");
         lastScheduledTimestamp = (Long) map.get("lastScheduledTimestamp");
-        previousAlpha = (Long) map.get("previousAlpha");
+        previousAlpha = (Double) map.get("previousAlpha");
         counter = (Integer) map.get("counter");
-        previousError = (Long) map.get("previousError");
-        kp = (Long) map.get("kp");
-        kd = (Long) map.get("kd");
+        previousError = (Double) map.get("previousError");
+        kp = (Double) map.get("kp");
+        kd = (Double) map.get("kd");
         primaryTreeMap = (TreeMap) map.get("primaryTreeMap");
         secondaryTreeMap = (TreeMap) map.get("secondaryTreeMap");
         dataItemList = (List) map.get("dataItemList");
@@ -144,12 +149,6 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
         ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<StreamEvent>(false);
         try {
             lock.lock();
-            NormalDistribution actualDistribution = new NormalDistribution();
-
-            double criticalValue = Math.abs(actualDistribution.inverseCumulativeProbability
-                    ((1 - confidenceLevel) / 2));
-            WindowCoverage obj = new WindowCoverage(errorThreshold);
-
             while (streamEventChunk.hasNext()) {
                 StreamEvent event = streamEventChunk.next();
 
@@ -157,12 +156,7 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                     streamEventChunk.remove();
                     long timestamp = (Long) timestampExecutor.execute(event);
                     timestampList.add(timestamp);
-                    double correlationField;
-                    if (!isIntCorrelationField) {
-                        correlationField = (Double) correlationFieldExecutor.execute(event);
-                    } else {
-                        correlationField = ((Integer) correlationFieldExecutor.execute(event)).doubleValue();
-                    }
+                    double correlationField = (Integer) correlationFieldExecutor.execute(event);
                     dataItemList.add(correlationField);
                     if (discardFlag) {
                         if (timestamp < lastSentTimestamp) {
@@ -181,13 +175,14 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                     counter += 1;
                     if (counter > batchSize) {
                         long adjustedBatchsize = Math.round(batchSize * 0.75);
-                        alpha = calculateAlpha(obj.calculateWindowCoverageThreshold(criticalValue,
+                        alpha = calculateAlpha(windowCoverage.calculateWindowCoverageThreshold(criticalValue,
                                 dataItemList),
-                                obj.calculateRuntimeWindowCoverage(timestampList,
+                                windowCoverage.calculateRuntimeWindowCoverage(timestampList,
                                         adjustedBatchsize));
                         counter = 0;
-                        timestampList = new ArrayList<Long>();
-                        dataItemList = new ArrayList<Double>();
+                        timestampList.clear();
+                        ;
+                        dataItemList.clear();
                     }
                     if (timestamp > largestTimestamp) {
                         largestTimestamp = timestamp;
@@ -211,10 +206,10 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                                 list.addAll(entry.getValue());
                             } else {
                                 secondaryTreeMap.put(entry.getKey(),
-                                        new ArrayList<StreamEvent>(entry.getValue()));
+                                        new ArrayList<>(entry.getValue()));
                             }
                         }
-                        primaryTreeMap = new TreeMap<Long, List<StreamEvent>>();
+                        primaryTreeMap.clear();
                         entryIterator = secondaryTreeMap.entrySet().iterator();
                         while (entryIterator.hasNext()) {
                             Map.Entry<Long, List<StreamEvent>> entry = entryIterator.next();
@@ -226,11 +221,14 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                                 for (StreamEvent aTimeEventList : timeEventList) {
                                     complexEventChunk.add(aTimeEventList);
                                 }
+                            } else {
+                                break;
                             }
                         }
                     }
                 } else {
-                    if (secondaryTreeMap.size() > 0) {
+                    if (timerDuration != -1) {
+                        if (secondaryTreeMap.size() > 0) {
                         for (Map.Entry<Long, List<StreamEvent>> longListEntry :
                                 secondaryTreeMap.entrySet()) {
                             List<StreamEvent> timeEventList = longListEntry.getValue();
@@ -258,6 +256,7 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                     }
 
                     timerFlag = true;
+                }
                 }
             }
         } catch (ArrayIndexOutOfBoundsException ec) {
@@ -313,7 +312,6 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
             } else if (attributeExpressionExecutors[1].getReturnType() == Attribute.Type.INT) {
                 correlationFieldExecutor = attributeExpressionExecutors[1];
                 attributes.add(new Attribute("beta1", Attribute.Type.DOUBLE));
-                isIntCorrelationField = true;
             } else {
                 throw new SiddhiAppCreationException("Invalid parameter type found for " +
                         "the second argument of " +
@@ -418,7 +416,7 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                 if (attributeExpressionExecutors[7].getReturnType() == Attribute.Type.DOUBLE) {
                     confidenceLevel = (Double) ((ConstantExpressionExecutor)
                             attributeExpressionExecutors[7]).getValue();
-                    attributes.add(new Attribute("beta6", Attribute.Type.DOUBLE));
+                    attributes.add(new Attribute("beta7", Attribute.Type.DOUBLE));
                 } else {
                     throw new SiddhiAppCreationException("Invalid parameter type found for " +
                             "the eighth argument of " +
@@ -431,7 +429,10 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                         "confidenceLevel must be constants");
             }
         }
-
+        NormalDistribution actualDistribution = new NormalDistribution();
+        criticalValue = Math.abs(actualDistribution.inverseCumulativeProbability
+                ((1 - confidenceLevel) / 2));
+        windowCoverage = new WindowCoverage(errorThreshold);
         primaryTreeMap = new TreeMap<Long, List<StreamEvent>>();
         secondaryTreeMap = new TreeMap<Long, List<StreamEvent>>();
 

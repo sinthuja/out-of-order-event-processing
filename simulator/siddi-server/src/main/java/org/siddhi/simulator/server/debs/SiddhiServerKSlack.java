@@ -39,7 +39,7 @@ public class SiddhiServerKSlack {
         siddhiManager.setExtension("reorder:kslack", KSlackExtension.class);
 
         String query = ("@info(name = 'query1') " +
-                "from inputStream#reorder:kslack(ts, 10L) " +
+                "from inputStream#reorder:kslack(ts, -1L) " +
                 "select sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts " +
                 "insert into outputStream;");
 
@@ -49,7 +49,7 @@ public class SiddhiServerKSlack {
         executionPlanRuntime.addCallback("outputStream", new StreamCallback() {
             private int count = 0;
             private long latency = 0;
-            private long lastEventTime = -1;
+            private long lastEventTime = 0;
             private int ooOrdereventsCount = 0;
 
             @Override
@@ -58,9 +58,12 @@ public class SiddhiServerKSlack {
                     latency = latency + (System.currentTimeMillis() - (Long) event.getData()[2]);
                     count++;
                     long currentEventTime = (Long) event.getData()[3];
-                    if (lastEventTime > currentEventTime) {
-                        ooOrdereventsCount++;
+                    if (lastEventTime == 0) {
+                        lastEventTime = currentEventTime;
                     } else {
+                        if (currentEventTime < lastEventTime) {
+                            ooOrdereventsCount++;
+                        }
                         lastEventTime = currentEventTime;
                     }
                 }

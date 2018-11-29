@@ -28,9 +28,12 @@ import org.wso2.siddhi.query.api.definition.StreamDefinition;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -39,10 +42,11 @@ public class MultipleSourceKSlack {
     private static Splitter splitter = Splitter.on(',');
     private static final int bundleSize = 100;
     private static Map<String, LinkedBlockingQueue<Event>> eventsQueue = new HashMap<>();
+    private static List<AsyncSourceKSlack> clients = new ArrayList<>();
     public static boolean START = false;
 
     public static void main(String[] args) {
-        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/5-source/dataset2";
+        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset3";
         loadData(path);
         final StreamDefinition streamDefinition = StreamDefinition.id("inputStream")
                 .attribute("sid", Attribute.Type.INT)
@@ -62,9 +66,13 @@ public class MultipleSourceKSlack {
                 .attribute("seqNum", Attribute.Type.LONG);
         Attribute.Type[] types = EventDefinitionConverterUtil
                 .generateAttributeTypeArray(streamDefinition.getAttributeList());
+        ExecutorService service = Executors.newFixedThreadPool(eventsQueue.size());
         for (Map.Entry<String, LinkedBlockingQueue<Event>> entry : eventsQueue.entrySet()) {
             AsyncSourceKSlack source = new AsyncSourceKSlack(entry.getKey(), types, entry.getValue(), bundleSize);
-            Executors.newFixedThreadPool(eventsQueue.size()).submit(source);
+            clients.add(source);
+        }
+        for (AsyncSourceKSlack sourceKSlack : clients) {
+            service.submit(sourceKSlack);
         }
         START = true;
     }

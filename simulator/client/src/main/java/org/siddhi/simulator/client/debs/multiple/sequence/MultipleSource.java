@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class MultipleSource {
@@ -47,7 +48,10 @@ public class MultipleSource {
     public static boolean START = false;
 
     public static void main(String[] args) {
-        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/20-source/dataset2";
+        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset3";
+        if (args.length == 1){
+            path = args[0];
+        }
         loadData(path);
         final StreamDefinition streamDefinition = StreamDefinition.id("inputStream")
                 .attribute("sid", Attribute.Type.INT)
@@ -73,9 +77,10 @@ public class MultipleSource {
             asyncSources.add(source);
         }
         for (AsyncSource asyncSource: asyncSources){
-            service.submit(asyncSource);
+             service.submit(asyncSource);
         }
         START = true;
+        service.shutdown();
     }
 
     private static void loadData(String filePath) {

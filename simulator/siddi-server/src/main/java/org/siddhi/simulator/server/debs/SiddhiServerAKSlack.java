@@ -19,7 +19,6 @@ package org.siddhi.simulator.server.debs;
 
 import org.apache.log4j.Logger;
 import org.siddhi.extension.disorder.handler.slack.AlphaKSlackExtension;
-import org.siddhi.extension.disorder.handler.slack.KSlackExtension;
 import org.wso2.siddhi.core.SiddhiAppRuntime;
 import org.wso2.siddhi.core.SiddhiManager;
 import org.wso2.siddhi.core.stream.output.StreamCallback;
@@ -49,7 +48,7 @@ public class SiddhiServerAKSlack {
         executionPlanRuntime.addCallback("outputStream", new StreamCallback() {
             private int count = 0;
             private long latency = 0;
-            private long lastEventTime = -1;
+            private long lastTimestamp = 0;
             private int ooOrdereventsCount = 0;
 
             @Override
@@ -57,11 +56,14 @@ public class SiddhiServerAKSlack {
                 for (org.wso2.siddhi.core.event.Event event : events) {
                     latency = latency + (System.currentTimeMillis() - (Long) event.getData()[2]);
                     count++;
-                    long currentEventTime = (Long) event.getData()[3];
-                    if (lastEventTime > currentEventTime) {
-                        ooOrdereventsCount++;
+                    long currentTimestamp = (Long) event.getData()[3];
+                    if (lastTimestamp == 0) {
+                        lastTimestamp = currentTimestamp;
                     } else {
-                        lastEventTime = currentEventTime;
+                        if (currentTimestamp < lastTimestamp ) {
+                            ooOrdereventsCount++;
+                        }
+                        lastTimestamp = currentTimestamp;
                     }
                 }
                 System.out.println("------------------------------------");
