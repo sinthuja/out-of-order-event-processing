@@ -51,11 +51,25 @@ public class SiddhiServerKSlack {
             private long latency = 0;
             private long lastEventTime = 0;
             private int ooOrdereventsCount = 0;
+            private long maxLatency = -1;
+            private long minLatency = -1;
 
             @Override
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
                 for (org.wso2.siddhi.core.event.Event event : events) {
-                    latency = latency + (System.currentTimeMillis() - (Long) event.getData()[2]);
+                    long delay = System.currentTimeMillis() - (Long) event.getData()[2];
+                    latency = latency + delay;
+
+                    if (minLatency == -1) {
+                        minLatency = delay;
+                    } else if (minLatency > delay) {
+                        minLatency = delay;
+                    }
+                    if (maxLatency == -1) {
+                        maxLatency = delay;
+                    } else if (maxLatency < delay) {
+                        maxLatency = delay;
+                    }
                     count++;
                     long currentEventTime = (Long) event.getData()[3];
                     if (lastEventTime == 0) {
@@ -67,10 +81,15 @@ public class SiddhiServerKSlack {
                         lastEventTime = currentEventTime;
                     }
                 }
+//                totalEvents = count;
+//                averageLatency = latency / count;
+//                totalOOEvents = ooOrdereventsCount;
                 System.out.println("------------------------------------");
-                System.out.println("Total Events => " + count);
-                System.out.println("Average Latency => " + latency / count);
-                System.out.println("Out of order total events => " + ooOrdereventsCount);
+                System.out.println("Total Events => \t" + count);
+                System.out.println("Average Latency => \t" + latency / count);
+                System.out.println("Min Latency => \t" + minLatency);
+                System.out.println("Max Latency => \t" + maxLatency);
+                System.out.println("Out of order total events => \t" + ooOrdereventsCount);
                 System.out.println("------------------------------------");
             }
         });

@@ -175,12 +175,6 @@ public class KSlackExtension extends StreamProcessor implements SchedulingProces
         } finally {
             lock.unlock();
         }
-        if (printcount == 10) {
-            System.out.println("Total count :" + totalCount);
-            printcount = 0;
-        } else {
-            printcount++;
-        }
         if (nextProcessor != null) {
             nextProcessor.process(complexEventChunk);
         }

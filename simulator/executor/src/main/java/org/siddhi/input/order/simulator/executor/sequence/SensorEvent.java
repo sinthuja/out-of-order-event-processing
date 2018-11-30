@@ -20,6 +20,7 @@ package org.siddhi.input.order.simulator.executor.sequence;
 public class SensorEvent implements Comparable<SensorEvent> {
     private long timestamp;
     private String eventLine;
+    private int sensorId = -1;
 
     public SensorEvent(long timestamp, String eventLine) {
         this.timestamp = timestamp;
@@ -29,11 +30,20 @@ public class SensorEvent implements Comparable<SensorEvent> {
     public void updateEvent(long sequenceNumber, int sensorId) {
         eventLine = eventLine + "," + sensorId + "," + sequenceNumber;
     }
+
     public String getEventLine() {
         return eventLine;
     }
 
-    public long getTimestamp(){
+    public Integer getSensorId() {
+        if (sensorId == -1) {
+            String[] elements = this.eventLine.split(",");
+            this.sensorId = Integer.parseInt(elements[elements.length - 2]);
+        }
+        return sensorId;
+    }
+
+    public long getTimestamp() {
         return timestamp;
     }
 

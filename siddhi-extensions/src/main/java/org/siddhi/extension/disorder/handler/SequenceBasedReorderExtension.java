@@ -43,6 +43,7 @@ import org.wso2.siddhi.query.api.definition.AbstractDefinition;
 import org.wso2.siddhi.query.api.definition.Attribute;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Extension(
         name = "sequence",
@@ -69,7 +70,7 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
     private boolean dropIfSeqNumAlreadyPassed = true;
     private String streamId;
 
-    private HashMap<String, EventSource> sourceHashMap = new HashMap<>();
+    private ConcurrentHashMap<String, EventSource> sourceHashMap = new ConcurrentHashMap<>();
 
     @Override
     protected void process(ComplexEventChunk<StreamEvent> complexEventChunk, Processor processor,

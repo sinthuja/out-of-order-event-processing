@@ -44,9 +44,11 @@ public class MultipleSourceKSlack {
     private static Map<String, LinkedBlockingQueue<Event>> eventsQueue = new HashMap<>();
     private static List<AsyncSourceKSlack> clients = new ArrayList<>();
     public static boolean START = false;
+    private static long minTimestamp = -1;
+
 
     public static void main(String[] args) {
-        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset3";
+        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/20-source/dataset3";
         loadData(path);
         final StreamDefinition streamDefinition = StreamDefinition.id("inputStream")
                 .attribute("sid", Attribute.Type.INT)
@@ -68,13 +70,14 @@ public class MultipleSourceKSlack {
                 .generateAttributeTypeArray(streamDefinition.getAttributeList());
         ExecutorService service = Executors.newFixedThreadPool(eventsQueue.size());
         for (Map.Entry<String, LinkedBlockingQueue<Event>> entry : eventsQueue.entrySet()) {
-            AsyncSourceKSlack source = new AsyncSourceKSlack(entry.getKey(), types, entry.getValue(), bundleSize);
+            AsyncSourceKSlack source = new AsyncSourceKSlack(entry.getKey(), types, entry.getValue(), bundleSize, minTimestamp);
             clients.add(source);
         }
         for (AsyncSourceKSlack sourceKSlack : clients) {
             service.submit(sourceKSlack);
         }
         START = true;
+        service.shutdown();
     }
 
     private static void loadData(String filePath) {
@@ -101,6 +104,7 @@ public class MultipleSourceKSlack {
                     String az = dataStrIterator.next();
                     String sourceId = dataStrIterator.next();
                     String sequenceNum = dataStrIterator.next();
+                    long timestamp = Long.parseLong(ts);
                     Object[] eventData = new Object[]{
                             sid,
                             Long.parseLong(ts), //Since this value is in pico seconds we
@@ -126,6 +130,13 @@ public class MultipleSourceKSlack {
                         eventsQueue.putIfAbsent(sourceId, queue);
                     }
                     queue.put(event);
+                    if (minTimestamp == -1){
+                        minTimestamp = timestamp;
+                    } else {
+                        if (minTimestamp > timestamp){
+                            minTimestamp = timestamp;
+                        }
+                    }
                     line = br.readLine();
 //                    if (count > 100000) {
 //                        break;

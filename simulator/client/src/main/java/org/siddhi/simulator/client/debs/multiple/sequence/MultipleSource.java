@@ -46,9 +46,11 @@ public class MultipleSource {
     private static Map<String, LinkedBlockingQueue<Event>> eventsQueue = new HashMap<>();
     private static List<AsyncSource> asyncSources = new ArrayList<>();
     public static boolean START = false;
+    private static long minTimestamp = -1;
 
     public static void main(String[] args) {
-        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset3";
+        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/20-source/dataset3";
+//        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset1";
         if (args.length == 1){
             path = args[0];
         }
@@ -73,8 +75,10 @@ public class MultipleSource {
                 .generateAttributeTypeArray(streamDefinition.getAttributeList());
         ExecutorService service = Executors.newFixedThreadPool(eventsQueue.size());
         for (Map.Entry<String, LinkedBlockingQueue<Event>> entry : eventsQueue.entrySet()) {
-            AsyncSource source = new AsyncSource(entry.getKey(), types, entry.getValue(), bundleSize);
-            asyncSources.add(source);
+//            if (entry.getKey().equalsIgnoreCase("1")) {
+                AsyncSource source = new AsyncSource(entry.getKey(), types, entry.getValue(), bundleSize, minTimestamp);
+                asyncSources.add(source);
+//            }
         }
         for (AsyncSource asyncSource: asyncSources){
              service.submit(asyncSource);
@@ -107,6 +111,7 @@ public class MultipleSource {
                     String az = dataStrIterator.next();
                     String sourceId = dataStrIterator.next();
                     String sequenceNum = dataStrIterator.next();
+                    long timestamp = Long.parseLong(ts);
                     Object[] eventData = new Object[]{
                             sid,
                             Long.parseLong(ts), //Since this value is in pico seconds we
@@ -130,6 +135,13 @@ public class MultipleSource {
                     if (queue == null) {
                         queue = new LinkedBlockingQueue<>();
                         eventsQueue.putIfAbsent(sourceId, queue);
+                    }
+                    if (minTimestamp == -1){
+                        minTimestamp = timestamp;
+                    } else {
+                        if (minTimestamp > timestamp){
+                            minTimestamp = timestamp;
+                        }
                     }
                     queue.put(event);
                     line = br.readLine();

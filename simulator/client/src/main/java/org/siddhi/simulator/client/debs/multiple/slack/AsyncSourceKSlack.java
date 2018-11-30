@@ -34,13 +34,18 @@ public class AsyncSourceKSlack implements Runnable {
     private LinkedBlockingQueue<Event> queue;
     private int bundleSize;
     private TCPNettyClient tcpNettyClient;
+    private long minTimestamp;
+    private long maxTimestamp;
+    private String sourceId;
 
 
     public AsyncSourceKSlack(String sourceId, Attribute.Type[] types,
-                             LinkedBlockingQueue<Event> queue, int bundleSize) {
+                             LinkedBlockingQueue<Event> queue, int bundleSize, long minTimestamp) {
         this.types = types;
         this.queue = queue;
         this.bundleSize = bundleSize;
+        this.minTimestamp = minTimestamp;
+        this.sourceId = sourceId;
         try {
             tcpNettyClient = new TCPNettyClient();
             tcpNettyClient.connect("localhost", 9892);
@@ -57,13 +62,28 @@ public class AsyncSourceKSlack implements Runnable {
             } catch (InterruptedException ignored) {
             }
         }
+        Event firstEvent = null;
         try {
             int bundleIndex = 0;
             Event[] eventBundle = new Event[bundleSize];
             int count = 0;
+            Event currentEvent = queue.poll();
+            firstEvent = currentEvent;
+            long firstEventTime = (Long) currentEvent.getData()[1];
+            long initialWaitTime = (firstEventTime - minTimestamp) / 1000000000L;
+            if (initialWaitTime > 0) {
+                System.out.println("Source ID :" + sourceId + " , initial sleep : " + initialWaitTime);
+                Thread.sleep(initialWaitTime);
+            }
             while (true) {
-                Event event = queue.poll();
-                if (event == null) {
+                long currentEventTime = (Long) currentEvent.getData()[1];
+                if (maxTimestamp == -1) {
+                    maxTimestamp = (Long) currentEvent.getData()[1];
+                } else if (maxTimestamp < currentEventTime) {
+                    maxTimestamp = currentEventTime;
+                }
+                Event nextEvent = queue.poll();
+                if (currentEvent == null) {
                     if (bundleIndex != 0) {
                         eventBundle = Arrays.copyOf(eventBundle, bundleIndex);
                         tcpNettyClient.send("TestServer/inputStream",
@@ -75,9 +95,34 @@ public class AsyncSourceKSlack implements Runnable {
                         break;
                     }
                 } else {
-                    event.setTimestamp(System.currentTimeMillis());
-                    eventBundle[bundleIndex] = event;
+//                    long currentEventTime = (Long) currentEvent.getData()[1];
+                    currentEvent.setTimestamp(System.currentTimeMillis());
+                    eventBundle[bundleIndex] = currentEvent;
                     bundleIndex++;
+                    if (nextEvent != null) {
+                        long nextEventTime = (Long) nextEvent.getData()[1];
+                        if (currentEventTime < nextEventTime) {
+                            eventBundle = Arrays.copyOf(eventBundle, bundleIndex);
+                            long waitTime = (nextEventTime - currentEventTime) / 1000000000L;
+                            long startTime = System.currentTimeMillis();
+                            tcpNettyClient.send("TestServer/inputStream",
+                                    BinaryEventConverter.convertToBinaryMessage(eventBundle, types).array()).await();
+                            long waitingTime = waitTime - (System.currentTimeMillis() - startTime);
+                            if (waitingTime > 0) {
+                                if (waitingTime > 1000) {
+                                    System.out.println("Sleeping for : " + waitingTime);
+                                }
+                                try {
+                                    Thread.sleep(waitingTime);
+                                } catch (Throwable ignored) {
+                                }
+                            }
+                            count = count + eventBundle.length;
+                            bundleIndex = 0;
+                            eventBundle = new Event[bundleSize];
+                        }
+                    }
+                    currentEvent = nextEvent;
                 }
                 if (bundleIndex == bundleSize) {
                     tcpNettyClient.send("TestServer/inputStream", BinaryEventConverter.convertToBinaryMessage(
@@ -91,10 +136,17 @@ public class AsyncSourceKSlack implements Runnable {
         } catch (IOException | InterruptedException e) {
             log.error(e);
         } finally {
+            try {
+                firstEvent.getData()[1] = maxTimestamp+1;
+                tcpNettyClient.send("TestServer/inputStream", BinaryEventConverter.convertToBinaryMessage(
+                        new Event[]{firstEvent}, types).array()).await();
+            } catch (InterruptedException | IOException ignored) {
+            }
             if (tcpNettyClient != null) {
                 tcpNettyClient.disconnect();
                 tcpNettyClient.shutdown();
             }
         }
+
     }
 }
