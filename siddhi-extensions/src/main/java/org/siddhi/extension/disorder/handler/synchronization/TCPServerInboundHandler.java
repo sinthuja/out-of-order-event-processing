@@ -62,14 +62,15 @@ public class TCPServerInboundHandler extends ChannelInboundHandlerAdapter {
                 long requestReceiveTime = in.readLong();
                 long replySendTime = in.readLong();
                 long replyReceiveTime = in.readLong();
-                long delay = Math.round(((replyReceiveTime - requestSendTime)
-                        - (replySendTime - requestReceiveTime)) * 0.5);
+                double delay = (((replySendTime - requestReceiveTime) -
+                        (replyReceiveTime - requestSendTime)) * 0.5);
                 // requestSentTime + drift + delay = requestReceiveTime
-                long drift = requestReceiveTime - replySendTime - delay;
+                double drift = ((requestSendTime - requestReceiveTime - delay) +
+                        (replyReceiveTime - replySendTime - delay)) * 0.5;
                 System.out.println("################### Current Drift => source : "
                         + sourceId + " , drift: " + drift);
                 EventSourceDriftHolder.getInstance().updateTimeDrift(sourceId,
-                        new EventSourceDriftHolder.EventSourceDriftInfo(drift, delay));
+                        new EventSourceDriftHolder.EventSourceDriftInfo(-drift, delay));
                 encoded = ctx.alloc().buffer(2);
                 encoded.writeByte(Constants.PROTOCOL_VERSION);
                 encoded.writeInt(Constants.SUCCESS_RESPONSE);

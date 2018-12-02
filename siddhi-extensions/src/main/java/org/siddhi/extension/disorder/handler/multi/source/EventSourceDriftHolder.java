@@ -49,12 +49,12 @@ public class EventSourceDriftHolder {
                     if (sourceDriftInfo == null) {
                         this.eventSourceDrift.put(key, timeDrift);
                     } else {
-                        sourceDriftInfo.drift = Math.round((sourceDriftInfo.drift + timeDrift.drift) * 0.5);
-                        sourceDriftInfo.transportDelay = Math.round((sourceDriftInfo.transportDelay
-                                + timeDrift.transportDelay) * 0.5);
+                        sourceDriftInfo.drift = (sourceDriftInfo.drift + timeDrift.drift) * 0.5;
+                        sourceDriftInfo.transportDelay = (sourceDriftInfo.transportDelay
+                                + timeDrift.transportDelay) * 0.5;
                         this.eventSourceDrift.put(key, sourceDriftInfo);
                         System.out.println("################### final Drift => source : "
-                                + sourceId + " , drift: " + sourceDriftInfo.drift);
+                                + sourceId + " , drift: " + Math.round(sourceDriftInfo.drift));
                     }
                 } else {
                     attempts.incrementAndGet();
@@ -70,18 +70,18 @@ public class EventSourceDriftHolder {
     }
 
     public long getDrift(String sourceId) {
-        return this.eventSourceDrift.get(getKey(sourceId)).drift;
+        return Math.round(this.eventSourceDrift.get(getKey(sourceId)).drift);
     }
 
     public long getTransportDelay(String sourceId) {
-        return this.eventSourceDrift.get(getKey(sourceId)).transportDelay;
+        return Math.round(this.eventSourceDrift.get(getKey(sourceId)).transportDelay);
     }
 
     public static class EventSourceDriftInfo {
-        private long drift;
-        private long transportDelay;
+        private double drift;
+        private double transportDelay;
 
-        public EventSourceDriftInfo(long drift, long transportDelay) {
+        public EventSourceDriftInfo(double drift, double transportDelay) {
             this.drift = drift;
             this.transportDelay = transportDelay;
         }

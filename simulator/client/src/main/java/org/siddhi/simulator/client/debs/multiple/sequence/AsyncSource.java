@@ -18,6 +18,7 @@
 package org.siddhi.simulator.client.debs.multiple.sequence;
 
 import org.apache.log4j.Logger;
+import org.siddhi.simulator.client.debs.multiple.sequence.drift.DriftedMultipleSource;
 import org.wso2.extension.siddhi.io.tcp.transport.TCPNettyClient;
 import org.wso2.extension.siddhi.map.binary.sinkmapper.BinaryEventConverter;
 import org.wso2.siddhi.core.event.Event;
@@ -47,6 +48,25 @@ public class AsyncSource implements Runnable {
         try {
             tcpNettyClient = new TCPNettyClient();
             tcpNettyClient.connect("localhost", 9892, 7452, sourceId, 10);
+        } catch (ConnectionUnavailableException e) {
+            log.error(e);
+        }
+    }
+
+    public AsyncSource(String sourceId, Attribute.Type[] types,
+                       LinkedBlockingQueue<Event> queue, int bundleSize, long minTimestamp, long driftInMS) {
+        this.types = types;
+        this.queue = queue;
+        this.bundleSize = bundleSize;
+        this.minTimestamp = minTimestamp;
+        this.sourceId = sourceId;
+        try {
+            tcpNettyClient = new TCPNettyClient();
+            //Host: 10.100.1.138
+            //Actual Event Receiver Port:
+            //Time Sync Receiver Port:
+            //Number of Time Sync Attempts: 10
+            tcpNettyClient.connect("localhost", 9892, 7452, sourceId, 15, driftInMS);
         } catch (ConnectionUnavailableException e) {
             log.error(e);
         }

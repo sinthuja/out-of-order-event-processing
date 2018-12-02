@@ -15,7 +15,7 @@
  * under the License.
  *
  */
-package org.siddhi.simulator.server.debs;
+package org.siddhi.simulator.server.drift;
 
 import org.apache.log4j.Logger;
 import org.siddhi.extension.disorder.handler.SequenceBasedReorderExtension;
@@ -26,31 +26,21 @@ import org.wso2.siddhi.core.stream.output.StreamCallback;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class SiddhiServer {
     private static final Logger log = Logger.getLogger(SiddhiServer.class);
-    private static long lastDataReceivedTimestamp = 0;
-    private static int totalEvents = 0;
-    private static double averageLatency = 0.0;
-    private static int totalOOEvents = 0;
-    private static String outputPath = "/Users/sinthu/wso2/sources/personal/git/test-results/results1.csv";
 
     public static void main(String[] args) {
         SiddhiManager siddhiManager = new SiddhiManager();
-        if (args.length == 1) {
-            outputPath = args[0];
-        }
         String inStreamDefinition = "@app:name('TestServer')" +
                 "@source(type='tcp', @map(type='binary')) " +
                 "define stream inputStream (sid int, ts long, x int, y int, z int, v_abs int, a_abs int, vx int, " +
-                "vy int, vz int, ax int, ay int, az int, sourceId string, seqNum long);";
+                "vy int, vz int, ax int, ay int, az int, sourceId string, seqNum long, driftedTs long);";
 
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
 
         String query = ("@info(name = 'query1') " +
-                "from inputStream#reorder:sequence(sourceId, seqNum, ts, 2L, false) " +
+                "from inputStream#reorder:sequence(sourceId, seqNum, driftedTs, 2L, false) " +
                 "select sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts " +
                 "insert into outputStream;");
 
@@ -92,9 +82,6 @@ public class SiddhiServer {
                         lastEventTime = currentEventTime;
                     }
                 }
-//                totalEvents = count;
-//                averageLatency = latency / count;
-//                totalOOEvents = ooOrdereventsCount;
                 System.out.println("------------------------------------");
                 System.out.println("Total Events => \t" + count);
                 System.out.println("Average Latency => \t" + latency / count);
@@ -104,55 +91,6 @@ public class SiddhiServer {
                 System.out.println("------------------------------------");
             }
         });
-//        ResultRecorder resultRecorder = new ResultRecorder();
-//        ExecutorService executorService = Executors.newSingleThreadExecutor();
-//        executorService.submit(resultRecorder);
         executionPlanRuntime.start();
-//        while (!resultRecorder.completed) {
-//            try {
-//                Thread.sleep(2000);
-//            } catch (InterruptedException ignored) {
-//            }
-//        }
-//        System.exit(0);
     }
-
-    public static class ResultRecorder implements Runnable {
-        private boolean completed = false;
-
-        @Override
-        public void run() {
-            while (true) {
-                if (lastDataReceivedTimestamp == 0) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ignored) {
-                    }
-                } else if (lastDataReceivedTimestamp > System.currentTimeMillis() - 10000) {
-                    try {
-                        Thread.sleep(5000);
-                    } catch (InterruptedException ignored) {
-
-                    }
-                } else {
-                    System.out.println("Writing the results");
-                    String output = totalEvents + "," + averageLatency + "," + totalOOEvents + "\n";
-
-                    BufferedWriter writer;
-                    try {
-                        writer = new BufferedWriter(new FileWriter(outputPath));
-                        writer.write(output);
-                        writer.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    completed = true;
-                    break;
-                }
-
-            }
-        }
-    }
-
-
 }
