@@ -21,7 +21,6 @@ import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.siddhi.extension.disorder.handler.SequenceBasedReorderExtension;
 import org.siddhi.extension.disorder.handler.TimeBatchWindowProcessor;
 import org.wso2.siddhi.core.SiddhiAppRuntime;
 import org.wso2.siddhi.core.SiddhiManager;
@@ -140,7 +139,7 @@ public class TimeBatchWindowTestCase {
                 "select symbol, sum(ifThenElse(windowType=='LOW',price, 0.0f)) as sumLowPrice , " +
                 "sum(ifThenElse(windowType=='MIDDLE',price, 0.0f)) as sumMiddlePrice, " +
                 "sum(ifThenElse(windowType=='HIGH',price, 0.0f)) as sumHighPrice, " +
-                "volume, windowType " +
+                " windowType " +
                 "insert all events into outputStream;";
 
         siddhiManager.setExtension("reorder:timeBatch", TimeBatchWindowProcessor.class);
@@ -173,11 +172,10 @@ public class TimeBatchWindowTestCase {
                 "define stream cseEventStream (symbol string, price float, volume int);";
         String query = "" +
                 "@info(name = 'query1') " +
-                "from cseEventStream#reorder:timeBatch(1 sec, 0, 10 milliseconds, false, true) " +
-                "select symbol, sum(ifThenElse(windowType=='LOW',price, 0.0f)) as sumLowPrice , " +
-                "sum(ifThenElse(windowType=='MIDDLE',price, 0.0f)) as sumMiddlePrice, " +
-                "sum(ifThenElse(windowType=='HIGH',price, 0.0f)) as sumHighPrice," +
-                "sum(ifThenElse(windowType=='FULL',price, 0.0f)) as sumFullPrice, " +
+                "from cseEventStream#reorder:timeBatch(1 sec, 0, 10 milliseconds, false, false) " +
+                "select symbol, (sum(ifThenElse(windowType=='LOW',price, 0.0f))+  " +
+                "sum(ifThenElse(windowType=='MIDDLE',price, 0.0f))+ " +
+                "sum(ifThenElse(windowType=='HIGH',price, 0.0f)))/3 as sumPrice," +
                 "volume, windowType " +
                 "insert all events into outputStream;";
 
@@ -195,8 +193,8 @@ public class TimeBatchWindowTestCase {
 
         InputHandler inputHandler = siddhiAppRuntime.getInputHandler("cseEventStream");
         siddhiAppRuntime.start();
-        inputHandler.send(new Object[]{"IBM", 700f, 0});
-        inputHandler.send(new Object[]{"WSO2", 60.5f, 1});
+        inputHandler.send(new Object[]{"IBM", 700f, 10});
+        inputHandler.send(new Object[]{"WSO2", 60.5f, 20});
         Thread.sleep(10000);
         Assert.assertTrue(eventArrived);
         siddhiAppRuntime.shutdown();

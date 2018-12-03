@@ -35,12 +35,14 @@ public class DataSetDelayAnalyzer{
     private static int batchSize = 10000;
 
     public static void main(String[] args) {
-        populateEvents("/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/in-order/dataset3", outofOrderEvents);
+        populateEvents("/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/in-order/dataset1", outofOrderEvents);
         StringBuilder output = new StringBuilder();
         int batch = 1;
         int iteration = 1;
         long lastTimestamp = 0;
         long totalDelay = 0;
+        long minDelay = -1;
+        long maxDelay = -1;
         for (int i = 0; i < outofOrderEvents.size(); i++) {
             Long timestamp = outofOrderEvents.get(i).getTimestamp();
             if (lastTimestamp == 0) {
@@ -48,18 +50,30 @@ public class DataSetDelayAnalyzer{
             } else {
                 long currentDelay = Math.abs(timestamp - lastTimestamp);
                 totalDelay += currentDelay;
+                if (minDelay == -1){
+                    minDelay = currentDelay;
+                } else if (minDelay > currentDelay){
+                    minDelay = currentDelay;
+                }
+                if (maxDelay == -1){
+                    maxDelay = currentDelay;
+                } else if (maxDelay < currentDelay){
+                    maxDelay = currentDelay;
+                }
                 lastTimestamp = timestamp;
             }
             if (batch == batchSize) {
 //                System.out.println(gap);
                 output.append(iteration * batch).append(",");
-                double doubleTotalDelay = totalDelay;
-
-                output.append((totalDelay/(double) batch)/1000000).append("\n");
+                output.append(minDelay/1000000).append(",");
+                output.append((totalDelay/(double) batch)/1000000).append(",");
+                output.append(maxDelay/1000000).append("\n");
                 iteration++;
                 batch = 1;
                 lastTimestamp = 0;
                 totalDelay = 0;
+                minDelay = -1;
+                maxDelay = -1;
             } else {
                 batch++;
             }

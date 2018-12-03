@@ -31,60 +31,29 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public class DataSetDelayAnalyzerMultipleSources {
+public class OutOfOrderEventsCalculator {
     private static Splitter splitter = Splitter.on(',');
     private static HashMap<Integer, List<SensorEvent>> allEvents = new HashMap<>();
     private static int batchSize = 10000;
 
     public static void main(String[] args) {
-        populateEvents("/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/5-source/dataset3");
+        populateEvents("/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/2-source/dataset3");
 //        populateEvents("/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/in-order/5-source/dataset3");
 
         for (Map.Entry<Integer, List<SensorEvent>> sensorEvents : allEvents.entrySet()) {
-            StringBuilder output = new StringBuilder();
-            int batch = 1;
-            int iteration = 1;
-            long lastTimestamp = 0;
-            long totalDelay = 0;
-            long maxDelay = -1;
+            long lastTimestamp = -1;
+            long ooOrderEvents = 0;
             List<SensorEvent> outofOrderEvents = sensorEvents.getValue();
             for (int i = 0; i < outofOrderEvents.size(); i++) {
                 Long timestamp = outofOrderEvents.get(i).getTimestamp();
-                if (lastTimestamp == 0) {
-                    lastTimestamp = timestamp;
-                } else {
-                    long currentDelay = Math.abs(timestamp - lastTimestamp);
-                    totalDelay += currentDelay;
-                    if (maxDelay == -1){
-                        maxDelay = currentDelay;
-                    } else if (maxDelay < currentDelay){
-                        maxDelay = currentDelay;
-                    }
-                    lastTimestamp = timestamp;
+                 if (lastTimestamp > timestamp){
+                   ooOrderEvents++;
                 }
-                if (batch == batchSize) {
-//                System.out.println(gap);
-                    output.append(iteration * batch).append(",");
-                    output.append((totalDelay / (double) batch) / 1000000).append(",");
-                    output.append(maxDelay/1000000).append("\n");
-                    iteration++;
-                    batch = 1;
-                    lastTimestamp = 0;
-                    totalDelay = 0;
-                    maxDelay = -1;
-                } else {
-                    batch++;
-                }
+                lastTimestamp = timestamp;
             }
-            BufferedWriter writer;
-            try {
-                writer = new BufferedWriter(new FileWriter(
-                        "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/data-set-delay-variation/delay-" + sensorEvents.getKey() + ".csv"));
-                writer.write(output.toString());
-                writer.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            System.out.println("Source : "+ sensorEvents.getKey());
+            System.out.println("OOrder events: "+ ooOrderEvents);
+            System.out.println("Total events: "+ outofOrderEvents.size());
         }
     }
 
@@ -112,5 +81,4 @@ public class DataSetDelayAnalyzerMultipleSources {
             e.printStackTrace();
         }
     }
-
 }

@@ -23,6 +23,11 @@
             <version>${siddhi.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.wso2.extension.siddhi.script.js</groupId>
+            <artifactId>siddhi-script-js</artifactId>
+            <version>4.0.14</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.log4j.wso2</groupId>
             <artifactId>log4j</artifactId>
             <version>${log4j.version}</version>
