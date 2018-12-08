@@ -43,13 +43,15 @@ public class RepetitiveMultipleSource {
     public static boolean START = false;
     private static long minTimestamp = -1;
     private static final int NUMBER_OF_SOUCES = 2;
-    private static long drift = 36000000000000L;
+    private static long drift = 5000000000L;
+//    private static long drift = 0L;
     private static final long skewTime = 3000000000L;
 
 
     public static void main(String[] args) {
 //        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/20-source/dataset3";
         String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset3";
+//        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/in-order/dataset3";
         loadData(path);
         final StreamDefinition streamDefinition = StreamDefinition.id("inputStream")
                 .attribute("sid", Attribute.Type.INT)
@@ -74,7 +76,7 @@ public class RepetitiveMultipleSource {
         for (int i = 0; i < NUMBER_OF_SOUCES; i++) {
             long currentDrift = i * drift ;
             RepetitiveAsyncSource source = new RepetitiveAsyncSource(String.valueOf(i), types,
-                    eventsQueue, bundleSize, minTimestamp, currentDrift, i*skewTime);
+                    eventsQueue, bundleSize, minTimestamp, currentDrift, i*skewTime, 0);
             clients.add(source);
         }
         for (RepetitiveAsyncSource sourceKSlack : clients) {

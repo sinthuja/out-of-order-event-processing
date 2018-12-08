@@ -41,7 +41,8 @@ public class RepetitiveAsyncSource implements Runnable {
 
 
     public RepetitiveAsyncSource(String sourceId, Attribute.Type[] types,
-                                 List<Event> queue, int bundleSize, long minTimestamp, long drift, long skewTime) {
+                                 List<Event> queue, int bundleSize, long minTimestamp, long drift, long skewTime,
+                                 long inMessageDelay) {
         this.types = types;
         this.queue = queue;
         this.bundleSize = bundleSize;
@@ -52,7 +53,7 @@ public class RepetitiveAsyncSource implements Runnable {
         try {
             tcpNettyClient = new TCPNettyClient();
             tcpNettyClient.connect("localhost", 9892, 7452, sourceId, 10,
-                    0);
+                    drift, inMessageDelay);
         } catch (ConnectionUnavailableException e) {
             log.error(e);
         }
