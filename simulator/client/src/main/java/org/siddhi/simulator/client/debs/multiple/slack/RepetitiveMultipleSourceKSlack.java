@@ -37,14 +37,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class MultipleSourceKSlack {
+public class RepetitiveMultipleSourceKSlack {
     private static final Logger log = Logger.getLogger(SingleEventSourcePublisher0.class);
     private static Splitter splitter = Splitter.on(',');
     private static final int bundleSize = 100;
-    private static Map<String, LinkedBlockingQueue<Event>> eventsQueue = new HashMap<>();
-    private static List<AsyncSourceKSlack> clients = new ArrayList<>();
+    private static Map<String, List<Event>> eventsQueue = new HashMap<>();
+    private static List<RepetitiveAsyncSourceKSlack> clients = new ArrayList<>();
     public static boolean START = false;
     private static long minTimestamp = -1;
+    private static final int NUMBER_OF_SOUCES = 10;
+    private static final long skewTime = 3000000000L;
 
 
     public static void main(String[] args) {
@@ -69,12 +71,14 @@ public class MultipleSourceKSlack {
                 .attribute("seqNum", Attribute.Type.LONG);
         Attribute.Type[] types = EventDefinitionConverterUtil
                 .generateAttributeTypeArray(streamDefinition.getAttributeList());
-        ExecutorService service = Executors.newFixedThreadPool(eventsQueue.size());
-        for (Map.Entry<String, LinkedBlockingQueue<Event>> entry : eventsQueue.entrySet()) {
-            AsyncSourceKSlack source = new AsyncSourceKSlack(entry.getKey(), types, entry.getValue(), bundleSize, minTimestamp);
+        ExecutorService service = Executors.newFixedThreadPool(NUMBER_OF_SOUCES);
+        for (int i = 0; i < NUMBER_OF_SOUCES; i++) {
+            long currentSkew = i * skewTime;
+            RepetitiveAsyncSourceKSlack source = new RepetitiveAsyncSourceKSlack(String.valueOf(i),types,
+                    eventsQueue.get("0"), bundleSize, minTimestamp, currentSkew);
             clients.add(source);
         }
-        for (AsyncSourceKSlack sourceKSlack : clients) {
+        for (RepetitiveAsyncSourceKSlack sourceKSlack : clients) {
             service.submit(sourceKSlack);
         }
         START = true;
@@ -125,16 +129,16 @@ public class MultipleSourceKSlack {
                             Long.parseLong(sequenceNum)
                     };
                     Event event = new Event(System.currentTimeMillis(), eventData);
-                    LinkedBlockingQueue<Event> queue = eventsQueue.get(sourceId);
+                    List<Event> queue = eventsQueue.get(sourceId);
                     if (queue == null) {
-                        queue = new LinkedBlockingQueue<>();
+                        queue = new ArrayList<>();
                         eventsQueue.putIfAbsent(sourceId, queue);
                     }
-                    queue.put(event);
-                    if (minTimestamp == -1){
+                    queue.add(event);
+                    if (minTimestamp == -1) {
                         minTimestamp = timestamp;
                     } else {
-                        if (minTimestamp > timestamp){
+                        if (minTimestamp > timestamp) {
                             minTimestamp = timestamp;
                         }
                     }

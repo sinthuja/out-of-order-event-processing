@@ -50,7 +50,7 @@ public class SiddhiServer {
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
 
         String query = ("@info(name = 'query1') " +
-                "from inputStream#reorder:sequence(sourceId, seqNum, ts, 2L, false) " +
+                "from inputStream#reorder:sequence(sourceId, seqNum, ts, 500L, false) " +
                 "select sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts " +
                 "insert into outputStream;");
 
@@ -64,6 +64,9 @@ public class SiddhiServer {
             private int ooOrdereventsCount = 0;
             private long maxLatency = -1;
             private long minLatency = -1;
+            private int batchSize = 10000;
+            private int batch = 1;
+            private int iteration = 1;
 
             @Override
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
@@ -91,17 +94,30 @@ public class SiddhiServer {
                         }
                         lastEventTime = currentEventTime;
                     }
+                    if (batch == batchSize) {
+                        System.out.println(batch * iteration + "," + (latency / (double) batch)
+                                + "," + (maxLatency)+","+ ooOrdereventsCount);
+                        maxLatency = -1;
+                        minLatency = -1;
+                        batch = 1;
+                        latency = 0;
+                        ooOrdereventsCount = 0;
+                        iteration++;
+                    } else {
+                        batch++;
+                    }
                 }
 //                totalEvents = count;
 //                averageLatency = latency / count;
 //                totalOOEvents = ooOrdereventsCount;
-                System.out.println("------------------------------------");
-                System.out.println("Total Events => \t" + count);
-                System.out.println("Average Latency => \t" + latency / count);
-                System.out.println("Min Latency => \t" + minLatency);
-                System.out.println("Max Latency => \t" + maxLatency);
-                System.out.println("Out of order total events => \t" + ooOrdereventsCount);
-                System.out.println("------------------------------------");
+//
+//                System.out.println("------------------------------------");
+//                System.out.println("Total Events => \t" + count);
+//                System.out.println("Average Latency => \t" + latency / count);
+//                System.out.println("Min Latency => \t" + minLatency);
+//                System.out.println("Max Latency => \t" + maxLatency);
+//                System.out.println("Out of order total events => \t" + ooOrdereventsCount);
+//                System.out.println("------------------------------------");
             }
         });
 //        ResultRecorder resultRecorder = new ResultRecorder();
@@ -115,43 +131,6 @@ public class SiddhiServer {
 //            }
 //        }
 //        System.exit(0);
-    }
-
-    public static class ResultRecorder implements Runnable {
-        private boolean completed = false;
-
-        @Override
-        public void run() {
-            while (true) {
-                if (lastDataReceivedTimestamp == 0) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ignored) {
-                    }
-                } else if (lastDataReceivedTimestamp > System.currentTimeMillis() - 10000) {
-                    try {
-                        Thread.sleep(5000);
-                    } catch (InterruptedException ignored) {
-
-                    }
-                } else {
-                    System.out.println("Writing the results");
-                    String output = totalEvents + "," + averageLatency + "," + totalOOEvents + "\n";
-
-                    BufferedWriter writer;
-                    try {
-                        writer = new BufferedWriter(new FileWriter(outputPath));
-                        writer.write(output);
-                        writer.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    completed = true;
-                    break;
-                }
-
-            }
-        }
     }
 
 

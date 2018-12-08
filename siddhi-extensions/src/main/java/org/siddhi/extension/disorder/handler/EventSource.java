@@ -81,8 +81,8 @@ public class EventSource {
         } else {
             String msg = "Expected Sequence number " + expectedNextSeqNumber + " is greater than received sequence number "
                     + sequenceNumber;
-            log.error("Expected Sequence number " + expectedNextSeqNumber + " is greater than received sequence number "
-                    + sequenceNumber);
+//            log.error("Expected Sequence number " + expectedNextSeqNumber + " is greater than received sequence number "
+//                    + sequenceNumber);
             long currentTime = System.currentTimeMillis();
             if (this.timeoutReleasedEvents.size() > 0) {
                 Iterator<Long> timeoutSequenceNumIterator = this.timeoutReleasedEvents.keySet().iterator();

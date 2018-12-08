@@ -37,7 +37,7 @@ public class OutOfOrderEventsCalculator {
     private static int batchSize = 10000;
 
     public static void main(String[] args) {
-        populateEvents("/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/2-source/dataset3");
+        populateEvents("/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/5-source/dataset3");
 //        populateEvents("/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/in-order/5-source/dataset3");
 
         for (Map.Entry<Integer, List<SensorEvent>> sensorEvents : allEvents.entrySet()) {
@@ -52,8 +52,8 @@ public class OutOfOrderEventsCalculator {
                 lastTimestamp = timestamp;
             }
             System.out.println("Source : "+ sensorEvents.getKey());
-            System.out.println("OOrder events: "+ ooOrderEvents);
-            System.out.println("Total events: "+ outofOrderEvents.size());
+            System.out.println("OOrder events: \t"+ ooOrderEvents);
+            System.out.println("Total events: \t\t"+ outofOrderEvents.size());
         }
     }
 

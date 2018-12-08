@@ -25,27 +25,32 @@ import org.wso2.siddhi.core.exception.ConnectionUnavailableException;
 import org.wso2.siddhi.query.api.definition.Attribute;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class AsyncSourceKSlack implements Runnable {
-    private static final Logger log = Logger.getLogger(AsyncSourceKSlack.class);
+public class RepetitiveAsyncSourceKSlack implements Runnable {
+    private static final Logger log = Logger.getLogger(RepetitiveAsyncSourceKSlack.class);
     private Attribute.Type[] types;
-    private LinkedBlockingQueue<Event> queue;
+    private List<Event> queue;
     private int bundleSize;
     private TCPNettyClient tcpNettyClient;
     private long minTimestamp;
     private long maxTimestamp;
     private String sourceId;
+    private long skewTime;
 
 
-    public AsyncSourceKSlack(String sourceId, Attribute.Type[] types,
-                             LinkedBlockingQueue<Event> queue, int bundleSize, long minTimestamp) {
+    public RepetitiveAsyncSourceKSlack(String sourceId, Attribute.Type[] types,
+                                       List<Event> queue, int bundleSize,
+                                       long minTimestamp, long skewTime) {
         this.types = types;
         this.queue = queue;
         this.bundleSize = bundleSize;
         this.minTimestamp = minTimestamp;
         this.sourceId = sourceId;
+        this.skewTime = skewTime;
         try {
             tcpNettyClient = new TCPNettyClient();
             tcpNettyClient.connect("localhost", 9892);
@@ -56,33 +61,41 @@ public class AsyncSourceKSlack implements Runnable {
 
     @Override
     public void run() {
-        while (!MultipleSourceKSlack.START) {
+        while (!RepetitiveMultipleSourceKSlack.START) {
             try {
                 Thread.sleep(1);
             } catch (InterruptedException ignored) {
             }
         }
-        Event firstEvent = null;
         try {
             int bundleIndex = 0;
             Event[] eventBundle = new Event[bundleSize];
             int count = 0;
-            Event currentEvent = queue.poll();
-            firstEvent = currentEvent;
+            Event currentEvent = queue.get(0);
+            currentEvent.getData()[1] = ((Long) currentEvent.getData()[1]) + skewTime;
             long firstEventTime = (Long) currentEvent.getData()[1];
             long initialWaitTime = (firstEventTime - minTimestamp) / 1000000000L;
             if (initialWaitTime > 0) {
                 System.out.println("Source ID :" + sourceId + " , initial sleep : " + initialWaitTime);
                 Thread.sleep(initialWaitTime);
             }
+            int i = 1;
             while (true) {
-                long currentEventTime = (Long) currentEvent.getData()[1];
-                if (maxTimestamp == -1) {
-                    maxTimestamp = (Long) currentEvent.getData()[1];
-                } else if (maxTimestamp < currentEventTime) {
-                    maxTimestamp = currentEventTime;
+                long currentEventTime = 0;
+                if (currentEvent != null) {
+                    currentEventTime = (Long) currentEvent.getData()[1];
+                    if (maxTimestamp == -1) {
+                        maxTimestamp = (Long) currentEvent.getData()[1];
+                    } else if (maxTimestamp < currentEventTime) {
+                        maxTimestamp = currentEventTime;
+                    }
                 }
-                Event nextEvent = queue.poll();
+
+                Event nextEvent = null;
+                if (i < queue.size()) {
+                    nextEvent = queue.get(i);
+                    nextEvent.getData()[1] = ((Long) nextEvent.getData()[1]) + skewTime;
+                }
                 if (currentEvent == null) {
                     if (bundleIndex != 0) {
                         eventBundle = Arrays.copyOf(eventBundle, bundleIndex);
@@ -110,7 +123,7 @@ public class AsyncSourceKSlack implements Runnable {
                             long waitingTime = waitTime - (System.currentTimeMillis() - startTime);
                             if (waitingTime > 0) {
                                 if (waitingTime > 1000) {
-                                    System.out.println("Sleeping for : " + waitingTime);
+                                    System.out.println("Sleeping for : " + waitingTime + " -  source Id :" + this.sourceId);
                                 }
                                 try {
                                     Thread.sleep(waitingTime);
@@ -131,22 +144,23 @@ public class AsyncSourceKSlack implements Runnable {
                     bundleIndex = 0;
                     eventBundle = new Event[bundleSize];
                 }
+                i++;
             }
-            log.info("Completed Publishing  events => " + count);
-        } catch (IOException | InterruptedException e) {
-            log.error(e);
+            log.info("Completed Publishing  events => " + count + " for source: " + sourceId);
+        } catch (Throwable e) {
+            e.printStackTrace();
         } finally {
-            try {
-                int i=1;
-                while (true) {
-                    Thread.sleep(1000);
-                    firstEvent.getData()[1] = maxTimestamp + (i*10000000000000L);
-                    tcpNettyClient.send("TestServer/inputStream", BinaryEventConverter.convertToBinaryMessage(
-                            new Event[]{firstEvent}, types).array()).await();
-                    i++;
-                }
-            } catch (InterruptedException | IOException ignored) {
-            }
+//            try {
+//                int i = 1;
+//                while (true) {
+//                    Thread.sleep(1000);
+//                    firstEvent.getData()[1] = maxTimestamp + (i * 10000000000000L);
+//                    tcpNettyClient.send("TestServer/inputStream", BinaryEventConverter.convertToBinaryMessage(
+//                            new Event[]{firstEvent}, types).array()).await();
+//                    i++;
+//                }
+//            } catch (InterruptedException | IOException ignored) {
+//            }
             if (tcpNettyClient != null) {
                 tcpNettyClient.disconnect();
                 tcpNettyClient.shutdown();

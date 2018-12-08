@@ -65,8 +65,8 @@ public class DataSetDelayAnalyzerMultipleSources {
                 if (batch == batchSize) {
 //                System.out.println(gap);
                     output.append(iteration * batch).append(",");
-                    output.append((totalDelay / (double) batch) / 1000000).append(",");
-                    output.append(maxDelay/1000000).append("\n");
+                    output.append((totalDelay / (double) batch) / 1000000000).append(",");
+                    output.append(maxDelay/(double)1000000000).append("\n");
                     iteration++;
                     batch = 1;
                     lastTimestamp = 0;

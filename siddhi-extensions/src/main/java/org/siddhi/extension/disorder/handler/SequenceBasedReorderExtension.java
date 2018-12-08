@@ -88,6 +88,7 @@ public class SequenceBasedReorderExtension extends StreamProcessor implements Sc
                     event = complexEventChunk.next();
                     complexEventChunk.remove();
                     if (event.getType().equals(ComplexEvent.Type.CURRENT)) {
+                        event.setTimestamp(System.currentTimeMillis());
                         sourceId = (String) sourceIdExecutor.execute(event);
                         sequenceNumber = (Long) sequenceNumberExecutor.execute(event);
                         EventSource source = sourceHashMap.get(sourceId);

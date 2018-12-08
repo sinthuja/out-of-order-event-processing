@@ -92,6 +92,8 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
     private SiddhiAppContext siddhiAppContext;
     private WindowCoverage windowCoverage;
     private double criticalValue;
+    private long L = 0;
+    private long windowSize = 10000000000L;
 
     public AlphaKSlackExtension() {
     }
@@ -174,14 +176,24 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                     eventList.add(event);
                     counter += 1;
                     if (counter > batchSize) {
-                        long adjustedBatchsize = Math.round(batchSize * 0.75);
-                        alpha = calculateAlpha(windowCoverage.calculateWindowCoverageThreshold(criticalValue,
-                                dataItemList),
-                                windowCoverage.calculateRuntimeWindowCoverage(timestampList,
-                                        adjustedBatchsize));
+                        if (L == 0) {
+                            alpha = calculateAlpha(windowCoverage.calculateWindowCoverageThreshold(criticalValue,
+                                    dataItemList), 1);
+                            L = Math.round(alpha * k);
+                            if (L > k) {
+                                L = k;
+                            }
+                        } else {
+                            alpha = calculateAlpha(windowCoverage.calculateWindowCoverageThreshold(criticalValue,
+                                    dataItemList),
+                                    windowCoverage.calculateRuntimeWindowCoverage(timestamp, timestampList,
+                                            L, windowSize));
+                            L = Math.round(alpha * k);
+                            if (L > k) {
+                                L = k;
+                            }
+                        }
                         counter = 0;
-                        timestampList.clear();
-                        ;
                         dataItemList.clear();
                     }
                     if (timestamp > largestTimestamp) {
@@ -229,34 +241,34 @@ public class AlphaKSlackExtension extends StreamProcessor implements SchedulingP
                 } else {
                     if (timerDuration != -1) {
                         if (secondaryTreeMap.size() > 0) {
-                        for (Map.Entry<Long, List<StreamEvent>> longListEntry :
-                                secondaryTreeMap.entrySet()) {
-                            List<StreamEvent> timeEventList = longListEntry.getValue();
+                            for (Map.Entry<Long, List<StreamEvent>> longListEntry :
+                                    secondaryTreeMap.entrySet()) {
+                                List<StreamEvent> timeEventList = longListEntry.getValue();
 
-                            for (StreamEvent aTimeEventList : timeEventList) {
-                                complexEventChunk.add(aTimeEventList);
+                                for (StreamEvent aTimeEventList : timeEventList) {
+                                    complexEventChunk.add(aTimeEventList);
+                                }
                             }
+
+                            secondaryTreeMap = new TreeMap<Long, List<StreamEvent>>();
+
                         }
 
-                        secondaryTreeMap = new TreeMap<Long, List<StreamEvent>>();
+                        if (primaryTreeMap.size() > 0) {
+                            for (Map.Entry<Long, List<StreamEvent>> longListEntry :
+                                    primaryTreeMap.entrySet()) {
+                                List<StreamEvent> timeEventList = longListEntry.getValue();
 
-                    }
-
-                    if (primaryTreeMap.size() > 0) {
-                        for (Map.Entry<Long, List<StreamEvent>> longListEntry :
-                                primaryTreeMap.entrySet()) {
-                            List<StreamEvent> timeEventList = longListEntry.getValue();
-
-                            for (StreamEvent aTimeEventList : timeEventList) {
-                                complexEventChunk.add(aTimeEventList);
+                                for (StreamEvent aTimeEventList : timeEventList) {
+                                    complexEventChunk.add(aTimeEventList);
+                                }
                             }
+
+                            primaryTreeMap = new TreeMap<Long, List<StreamEvent>>();
                         }
 
-                        primaryTreeMap = new TreeMap<Long, List<StreamEvent>>();
+                        timerFlag = true;
                     }
-
-                    timerFlag = true;
-                }
                 }
             }
         } catch (ArrayIndexOutOfBoundsException ec) {

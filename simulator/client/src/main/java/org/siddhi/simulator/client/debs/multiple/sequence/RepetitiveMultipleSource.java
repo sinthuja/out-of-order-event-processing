@@ -15,7 +15,7 @@
  * under the License.
  *
  */
-package org.siddhi.simulator.client.debs.multiple.slack;
+package org.siddhi.simulator.client.debs.multiple.sequence;
 
 import com.google.common.base.Splitter;
 import org.apache.log4j.Logger;
@@ -35,16 +35,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 
-public class MultipleSourceKSlack {
+public class RepetitiveMultipleSource {
     private static final Logger log = Logger.getLogger(SingleEventSourcePublisher0.class);
     private static Splitter splitter = Splitter.on(',');
     private static final int bundleSize = 100;
-    private static Map<String, LinkedBlockingQueue<Event>> eventsQueue = new HashMap<>();
-    private static List<AsyncSourceKSlack> clients = new ArrayList<>();
+    private static List<Event> eventsQueue = new ArrayList<>();
+    private static List<RepetitiveAsyncSource> clients = new ArrayList<>();
     public static boolean START = false;
     private static long minTimestamp = -1;
+    private static final int NUMBER_OF_SOUCES = 20;
+    private static final long skewTime = 3000000000L;
 
 
     public static void main(String[] args) {
@@ -69,12 +70,14 @@ public class MultipleSourceKSlack {
                 .attribute("seqNum", Attribute.Type.LONG);
         Attribute.Type[] types = EventDefinitionConverterUtil
                 .generateAttributeTypeArray(streamDefinition.getAttributeList());
-        ExecutorService service = Executors.newFixedThreadPool(eventsQueue.size());
-        for (Map.Entry<String, LinkedBlockingQueue<Event>> entry : eventsQueue.entrySet()) {
-            AsyncSourceKSlack source = new AsyncSourceKSlack(entry.getKey(), types, entry.getValue(), bundleSize, minTimestamp);
+        ExecutorService service = Executors.newFixedThreadPool(NUMBER_OF_SOUCES);
+        for (int i = 0; i < NUMBER_OF_SOUCES; i++) {
+            long currentSkew = i * skewTime;
+            RepetitiveAsyncSource source = new RepetitiveAsyncSource(String.valueOf(i), types,
+                    eventsQueue, bundleSize, minTimestamp, currentSkew);
             clients.add(source);
         }
-        for (AsyncSourceKSlack sourceKSlack : clients) {
+        for (RepetitiveAsyncSource sourceKSlack : clients) {
             service.submit(sourceKSlack);
         }
         START = true;
@@ -106,6 +109,7 @@ public class MultipleSourceKSlack {
                     String sourceId = dataStrIterator.next();
                     String sequenceNum = dataStrIterator.next();
                     long timestamp = Long.parseLong(ts);
+                    long eventTime = System.currentTimeMillis();
                     Object[] eventData = new Object[]{
                             sid,
                             Long.parseLong(ts), //Since this value is in pico seconds we
@@ -124,24 +128,16 @@ public class MultipleSourceKSlack {
                             sourceId,
                             Long.parseLong(sequenceNum)
                     };
-                    Event event = new Event(System.currentTimeMillis(), eventData);
-                    LinkedBlockingQueue<Event> queue = eventsQueue.get(sourceId);
-                    if (queue == null) {
-                        queue = new LinkedBlockingQueue<>();
-                        eventsQueue.putIfAbsent(sourceId, queue);
-                    }
-                    queue.put(event);
-                    if (minTimestamp == -1){
+                    Event event = new Event(eventTime, eventData);
+                    eventsQueue.add(event);
+                    if (minTimestamp == -1) {
                         minTimestamp = timestamp;
                     } else {
-                        if (minTimestamp > timestamp){
+                        if (minTimestamp > timestamp) {
                             minTimestamp = timestamp;
                         }
                     }
                     line = br.readLine();
-//                    if (count > 100000) {
-//                        break;
-//                    }
                     count++;
                 } catch (NumberFormatException ignored) {
                     line = br.readLine();

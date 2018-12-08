@@ -85,13 +85,15 @@ public class MultiSourceEventSynchronizer {
     }
 
     public void putEvent(String sourceId, List<StreamEventWrapper> eventList, ComplexEventPopulater complexEventPopulater) {
-        LinkedList<MultiSourceEventWrapper> streamPipe = getStreamPipe(sourceId);
-        long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
-        for (StreamEventWrapper eventWrapper : eventList) {
-            synchronized (linkedListLock) {
-                streamPipe.add(new MultiSourceEventWrapper(sourceId, eventWrapper.getStreamEvent(),
-                        eventWrapper.getEventTime() + drift,
-                        eventWrapper.getSequenceNum(), complexEventPopulater));
+        if (eventList != null) {
+            LinkedList<MultiSourceEventWrapper> streamPipe = getStreamPipe(sourceId);
+            long drift = EventSourceDriftHolder.getInstance().getDrift(sourceId);
+            for (StreamEventWrapper eventWrapper : eventList) {
+                synchronized (linkedListLock) {
+                    streamPipe.add(new MultiSourceEventWrapper(sourceId, eventWrapper.getStreamEvent(),
+                            eventWrapper.getEventTime() + drift,
+                            eventWrapper.getSequenceNum(), complexEventPopulater));
+                }
             }
         }
     }
@@ -111,9 +113,9 @@ public class MultiSourceEventSynchronizer {
     public class MultiSourceEventSynchronizingWorker extends Thread {
         private TreeSet<MultiSourceEventWrapper> events = new TreeSet<>();
         private ComplexEventChunk<StreamEvent> complexEventChunk = new ComplexEventChunk<>(false);
+        private int batch = 1000;
+        private int count = 0;
         private long sleptTime = 0;
-        private int sleepCount = 0;
-        private long totalTime = 0;
 
         public void run() {
             // TODO: get from the original event chunk
@@ -126,7 +128,6 @@ public class MultiSourceEventSynchronizer {
             while (true) {
                 try {
                     //Waiting until all sources have started to send events to synchronize.
-                    this.sleptTime = 0;
                     if (events.isEmpty()) {
                         //Iterate through all the sources, and fetch the first event in the queue (ie., the smallest
                         // timestamp events of the source)
@@ -147,23 +148,23 @@ public class MultiSourceEventSynchronizer {
                         MultiSourceEventWrapperQueue queue =
                                 sourceBasedStreams.get(flushedEvent.getSourceId());
                         //Commenting out this section as the synchronization starts once call the sources are connected.
-//                        if (events.size() != sourceBasedStreams.size() - 1) {
-//                            for (Map.Entry<String, MultiSourceEventWrapperQueue> eventQueue
-//                                    : sourceBasedStreams.entrySet()) {
-//                                boolean alreadyAdded = false;
-//                                for (MultiSourceEventWrapper eventWrapper : events) {
-//                                    if (eventWrapper.getSourceId().equalsIgnoreCase(eventQueue.getKey())) {
-//                                        alreadyAdded = true;
-//                                        break;
-//                                    }
-//                                }
-//                                if (!alreadyAdded) {
-//                                    populateEvent(eventQueue.getKey(), eventQueue.getValue());
-//                                }
-//                            }
-//                        } else {
+                        if (events.size() != sourceBasedStreams.size() - 1) {
+                            for (Map.Entry<String, MultiSourceEventWrapperQueue> eventQueue
+                                    : sourceBasedStreams.entrySet()) {
+                                boolean alreadyAdded = false;
+                                for (MultiSourceEventWrapper eventWrapper : events) {
+                                    if (eventWrapper.getSourceId().equalsIgnoreCase(eventQueue.getKey())) {
+                                        alreadyAdded = true;
+                                        break;
+                                    }
+                                }
+                                if (!alreadyAdded) {
+                                    populateEvent(eventQueue.getKey(), eventQueue.getValue());
+                                }
+                            }
+                        } else {
                             populateEvent(flushedEvent.getSourceId(), queue);
-//                        }
+                        }
                         checkAndPublishToNextProcess();
                     }
                 } catch (Throwable throwable) {
@@ -177,6 +178,12 @@ public class MultiSourceEventSynchronizer {
                 //Based on the comparator implemented the first event is the smallest timestamp
                 // event among all sources.
                 complexEventChunk.add(events.first().getEvent());
+                count++;
+                if (count == batch) {
+                    nextProcessor.process(complexEventChunk);
+                    complexEventChunk.clear();
+                    count = 0;
+                }
             } else {
                 // if all events are processed, then it's time to flush all events.
                 if (complexEventChunk.hasNext()) {
@@ -199,7 +206,9 @@ public class MultiSourceEventSynchronizer {
                         throwable.printStackTrace();
                     }
                 }
-            } else {
+            }
+
+            else {
                 if (complexEventChunk.hasNext()) {
                     nextProcessor.process(complexEventChunk);
                     complexEventChunk.clear();
@@ -211,19 +220,16 @@ public class MultiSourceEventSynchronizer {
 //                        if (permittedSleepTime > 0) {
 //                            Thread.sleep(permittedSleepTime);
 //                            sleptTime += permittedSleepTime;
-//                            System.out.println("Sleep for " + permittedSleepTime + " count : " + sleepCount);
-//                            sleepCount++;
 //                        }
                         long timeout = Utils.getTimeout(userDefinedTimeout, eventStreamTimeout.get(sourceId));
                         Thread.sleep(timeout);
-                        System.out.println("Sleep for " + timeout + " count : " + sleepCount);
-                        sleepCount++;
                     } catch (InterruptedException ignored) {
                     }
                     if (!queue.isEmpty()) {
                         synchronized (linkedListLock) {
                             if (!queue.isEmpty()) {
                                 events.add(queue.removeFirst());
+                                wrapperQueue.alreadyCheckedWithoutEvent = false;
                             }
                         }
                     } else {
