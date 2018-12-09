@@ -101,6 +101,7 @@ public class ExternalTimeBatchWindowProcessor extends StreamProcessor implements
     private MultiSourceEventSynchronizer eventSynchronizer;
     private VariableExpressionExecutor timestampExecutor;
     private AtomicBoolean isInit = new AtomicBoolean(false);
+    private String streamId;
 
     @Override
     public Scheduler getScheduler() {
@@ -116,7 +117,7 @@ public class ExternalTimeBatchWindowProcessor extends StreamProcessor implements
     protected List<Attribute> init(AbstractDefinition abstractDefinition, ExpressionExecutor[] expressionExecutors,
                                    ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
         this.siddhiAppContext = siddhiAppContext;
-        String streamId = abstractDefinition.getId();
+        this.streamId = "inputStream";
         this.eventSynchronizer = MultiSourceEventSynchronizerManager.getInstance()
                 .getMultiSourceEventSynchronizer(streamId);
         if (attributeExpressionExecutors.length == 1) {
@@ -168,6 +169,10 @@ public class ExternalTimeBatchWindowProcessor extends StreamProcessor implements
             //TODO: load the uncertain time dynamically after each expiry.
             long uncertainWindowBuffer;
             if (uncertainWindowRange == -1) {
+                if (this.eventSynchronizer == null){
+                    this.eventSynchronizer = MultiSourceEventSynchronizerManager.getInstance()
+                            .getMultiSourceEventSynchronizer(this.streamId);
+                }
                 uncertainWindowBuffer = this.eventSynchronizer.getUncertainTimeRange();
             } else {
                 uncertainWindowBuffer = this.uncertainWindowRange;

@@ -37,20 +37,22 @@ public class SiddhiServer {
 
 //        String query = ("@info(name = 'query1') " +
 //                "from inputStream#reorder:sequence(sourceId, seqNum, driftedTs, 500L, false) " +
-//                "select  sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts/1000000000L as occuredTime, v_abs " +
+//                "select  sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts as occuredTime, v_abs " +
 //                "insert into outputStream;");
 //
-//        String aggregation = "from outputStream#window.externalTimeBatch(occuredTime, 10 sec) " +
-//                "select sum(v_abs) as sumVelocity, occuredTime " +
+//        String aggregation = "from outputStream#window.externalTimeBatch(occuredTime, 10000000000 sec) " +
+//                "select avg(v_abs) as sumVelocity, occuredTime " +
 //                "insert into aggregateOutputStream";
 
-                String query = ("@info(name = 'query1') " +
+        String query = ("@info(name = 'query1') " +
                 "from inputStream#reorder:sequence(sourceId, seqNum, driftedTs, 500L, false) " +
-                "select  sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts/1000000000L as occuredTime, v_abs " +
+                "select  sourceId, seqNum, eventTimestamp() as relativeTimestamp, ts as occuredTime, v_abs " +
                 "insert into outputStream;");
 
-        String aggregation = "from outputStream#reorder:externalTimeBatch(occuredTime, 10 sec, true) " +
-                "select sum(v_abs) as sumVelocity, occuredTime " +
+        String aggregation = "from outputStream#reorder:externalTimeBatch(10000000000 sec, occuredTime, true, false) " +
+                "select avg(ifThenElse(windowType=='LOW',v_abs, 0)) as sumLow, " +
+                "avg(ifThenElse(windowType=='MIDDLE',v_abs, 0)) as sumMiddle, " +
+                "avg(ifThenElse(windowType=='HIGH',v_abs, 0)) as sumHigh, occuredTime " +
                 "insert into aggregateOutputStream";
 
         siddhiManager.setExtension("reorder:sequence", SequenceBasedReorderExtension.class);
@@ -114,7 +116,12 @@ public class SiddhiServer {
             @Override
             public void receive(org.wso2.siddhi.core.event.Event[] events) {
                 for (org.wso2.siddhi.core.event.Event event : events) {
-                    System.out.println(event.getData()[0] + "," + event.getData()[1]);
+                    Object[] data = event.getData();
+                    StringBuilder msg = new StringBuilder();
+                    for (Object aData: data){
+                        msg.append(aData).append(",");
+                    }
+                    System.out.println(msg);
                 }
             }
         });

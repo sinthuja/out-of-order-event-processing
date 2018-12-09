@@ -72,6 +72,9 @@ public class ExternalTimeBatchWindow {
                 }
 
                 long currentEventTime = (Long) timestampExpressionExecutor.execute(currStreamEvent);
+                if (currentEventTime < startTime){
+                    continue;
+                }
                 if (lastCurrentEventTime < currentEventTime) {
                     lastCurrentEventTime = currentEventTime;
                 }

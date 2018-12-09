@@ -101,7 +101,7 @@ public class MultiSourceEventSynchronizer {
     public long getUncertainTimeRange() {
         long delay = 0;
         for (String sourceId : this.sourceBasedStreams.keySet()) {
-            long eventSourceDelay = EventSourceDriftHolder.getInstance().getTransportDelay(sourceId);
+            long eventSourceDelay = Math.abs(EventSourceDriftHolder.getInstance().getTransportDelay(sourceId));
             if (eventSourceDelay > delay) {
                 delay = eventSourceDelay;
             }
