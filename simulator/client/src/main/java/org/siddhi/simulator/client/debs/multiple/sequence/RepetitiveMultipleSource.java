@@ -44,13 +44,13 @@ public class RepetitiveMultipleSource {
     private static List<RepetitiveAsyncSource> clients = new ArrayList<>();
     public static boolean START = false;
     private static long minTimestamp = -1;
-    private static final int NUMBER_OF_SOUCES = 20;
+    private static final int NUMBER_OF_SOUCES = 1;
     private static final long skewTime = 3000000000L;
 
 
     public static void main(String[] args) {
 //        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/multiple-source/out-of-order/20-source/dataset3";
-        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset3";
+        String path = "/Users/sinthu/wso2/sources/personal/git/AK-Slack/datasets/sequence/single-source/out-of-order/dataset4_1";
         loadData(path);
         final StreamDefinition streamDefinition = StreamDefinition.id("inputStream")
                 .attribute("sid", Attribute.Type.INT)
@@ -98,7 +98,7 @@ public class RepetitiveMultipleSource {
                     String x = dataStrIterator.next();
                     String y = dataStrIterator.next();
                     String z = dataStrIterator.next();
-                    String v_abs = dataStrIterator.next();
+                    String v_abs = dataStrIterator.next().split("\\.")[0];
                     String a_abs = dataStrIterator.next();
                     String vx = dataStrIterator.next();
                     String vy = dataStrIterator.next();

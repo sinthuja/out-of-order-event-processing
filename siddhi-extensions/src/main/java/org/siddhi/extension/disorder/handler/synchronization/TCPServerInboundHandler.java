@@ -68,7 +68,7 @@ public class TCPServerInboundHandler extends ChannelInboundHandlerAdapter {
                 double drift = ((requestSendTime - requestReceiveTime - delay) +
                         (replyReceiveTime - replySendTime - delay)) * 0.5;
                 if (drift > 5){
-                    delay = -125000000;
+                    delay = -50000000000.0;
                     drift = ((requestSendTime - requestReceiveTime - delay) +
                             (replyReceiveTime - replySendTime - delay)) * 0.5;
                 }
